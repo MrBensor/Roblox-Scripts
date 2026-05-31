@@ -1201,6 +1201,108 @@ function Library:CreateWindow(opts)
                 return I
             end
 
+            -- ═══ LISTBOX ════════════════════════════
+            function G:AddListBox(o)
+                o = o or {}
+                local boxH   = o.Height or 130
+                local sel    = nil
+                local items  = {}
+                local rows   = {}
+
+                local container = New("Frame", {
+                    Size = UDim2.new(1, 0, 0, boxH),
+                    BackgroundColor3 = Theme.Panel,
+                    BorderSizePixel = 0,
+                    ClipsDescendants = true,
+                    Parent = body,
+                })
+                Corner(3, container)
+                Stroke(Theme.BorderDim, 1, container)
+
+                local scroll = New("ScrollingFrame", {
+                    Size = UDim2.fromScale(1, 1),
+                    BackgroundTransparency = 1,
+                    BorderSizePixel = 0,
+                    ScrollBarThickness = 3,
+                    ScrollBarImageColor3 = Theme.Accent,
+                    CanvasSize = UDim2.new(0, 0, 0, 0),
+                    AutomaticCanvasSize = Enum.AutomaticSize.Y,
+                    Parent = container,
+                })
+                List(Enum.FillDirection.Vertical, 1, Enum.HorizontalAlignment.Left,
+                     Enum.VerticalAlignment.Top, scroll)
+
+                local empty = New("TextLabel", {
+                    Size = UDim2.new(1, 0, 0, 24),
+                    BackgroundTransparency = 1,
+                    Font = Theme.Font, TextSize = 11,
+                    Text = "no configs saved",
+                    TextColor3 = Theme.Muted,
+                    TextXAlignment = Enum.TextXAlignment.Center,
+                    Parent = scroll,
+                })
+
+                local L = {}
+                L.OnSelect = nil
+
+                local function applyRowStyle(row, name)
+                    local on = (name == sel)
+                    row.TextColor3 = on and Theme.Text or Theme.Dim
+                    row.BackgroundColor3 = on and Theme.Accent or Theme.Panel
+                    row.BackgroundTransparency = on and 0.72 or 1
+                end
+
+                local function buildRows()
+                    for _, r in ipairs(rows) do r:Destroy() end
+                    rows = {}
+                    empty.Visible = (#items == 0)
+                    for _, name in ipairs(items) do
+                        local row = New("TextButton", {
+                            Size = UDim2.new(1, 0, 0, 18),
+                            BorderSizePixel = 0,
+                            Font = Theme.Font, TextSize = Theme.Sz,
+                            Text = "  " .. name,
+                            TextXAlignment = Enum.TextXAlignment.Left,
+                            AutoButtonColor = false,
+                            Parent = scroll,
+                        })
+                        applyRowStyle(row, name)
+                        local n = name
+                        row.MouseEnter:Connect(function()
+                            if n ~= sel then tw(row, .08, { BackgroundTransparency = 0.88 }) end
+                        end)
+                        row.MouseLeave:Connect(function()
+                            if n ~= sel then tw(row, .08, { BackgroundTransparency = 1 }) end
+                        end)
+                        row.MouseButton1Click:Connect(function()
+                            sel = n
+                            for i, r in ipairs(rows) do applyRowStyle(r, items[i]) end
+                            if L.OnSelect then pcall(L.OnSelect, n) end
+                        end)
+                        table.insert(rows, row)
+                    end
+                end
+                buildRows()
+
+                function L:SetItems(list)
+                    items = list or {}
+                    if sel and not table.find(items, sel) then sel = nil end
+                    buildRows()
+                end
+                function L:GetSelected() return sel end
+                function L:SetSelected(name)
+                    if table.find(items, name) then
+                        sel = name
+                        for i, r in ipairs(rows) do applyRowStyle(r, items[i]) end
+                    end
+                end
+                function L:ClearSelection()
+                    sel = nil
+                    for i, r in ipairs(rows) do applyRowStyle(r, items[i]) end
+                end
+                return L
+            end
+
             return G
         end -- CreateGroup
 
