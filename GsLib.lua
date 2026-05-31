@@ -488,19 +488,20 @@ function Library:CreateWindow(opts)
 
     -- double border: outer frame (black fill + bright outer line)
     -- moves with main during drag
+    -- outer frame: black stripe + 1px bright line on outer edge
     local outerBorder = New("Frame", {
         Name = "OuterBorder",
-        Size = UDim2.fromOffset(sz.X + 4, sz.Y + 4),
-        Position = UDim2.new(.5, -sz.X/2 - 2, .5, -sz.Y/2 - 2),
+        Size = UDim2.fromOffset(sz.X + 10, sz.Y + 10),
+        Position = UDim2.new(.5, -sz.X/2 - 5, .5, -sz.Y/2 - 5),
         BackgroundColor3 = Theme.OuterBg,
         BorderSizePixel = 0,
         Parent = gui,
     })
-    Corner(5, outerBorder)
+    Corner(6, outerBorder)
     Stroke(Theme.Border, 1, outerBorder)
     Win.OuterBorder = outerBorder
 
-    -- Main (inner frame = inner bright line via Stroke)
+    -- inner frame: 2px bright inner line (same thickness as rainbow bar)
     local main = New("Frame", {
         Name = "Main",
         Size = UDim2.fromOffset(sz.X, sz.Y),
@@ -509,7 +510,7 @@ function Library:CreateWindow(opts)
         ClipsDescendants = true, Parent = gui,
     })
     Corner(4, main)
-    Stroke(Theme.BorderDim, 1, main)
+    Stroke(Theme.Border, 2, main)
     Win.Main = main
 
     -- top bar: colors come entirely from Theme.TopBarColors
@@ -576,8 +577,8 @@ function Library:CreateWindow(opts)
 
     local function syncBorder(mainPos)
         outerBorder.Position = UDim2.new(
-            mainPos.X.Scale, mainPos.X.Offset - 2,
-            mainPos.Y.Scale, mainPos.Y.Offset - 2
+            mainPos.X.Scale, mainPos.X.Offset - 5,
+            mainPos.Y.Scale, mainPos.Y.Offset - 5
         )
     end
 
@@ -638,10 +639,12 @@ function Library:CreateWindow(opts)
             t.SideBar.BackgroundTransparency = active and 0 or 1
             -- tab text
             if t.Btn then t.Btn.TextColor3 = active and Theme.Text or Theme.Dim end
-            -- active bg fill = same as main content bg → tab merges with panel
+            -- active bg fill = same as content bg so tab blends in
             t.ActiveBg.BackgroundTransparency = active and 0 or 1
-            -- merge strip covers the 1px sidebar border line
-            t.MergeBar.Visible = active
+            -- BorderCover sits over the sidebarBorder segment for this tab:
+            -- active → Theme.Bg (same as content, hides the line)
+            -- inactive → Theme.BorderDim (same as the line, invisible)
+            t.BorderCover.BackgroundColor3 = active and Theme.Bg or Theme.BorderDim
         end
         Win.ActiveTab = tab
         Win.CloseOverlays()
@@ -692,18 +695,19 @@ function Library:CreateWindow(opts)
                 TextColor3 = Theme.Dim, Parent = iconFrame,
             })
         end
-        -- merge bar: covers sidebar right border when this tab is active
-        local mergeBar = New("Frame", {
-            AnchorPoint = Vector2.new(1, 0),
-            Position    = UDim2.new(1, 1, 0, 0),
-            Size        = UDim2.new(0, 2, 1, 0),
-            BackgroundColor3 = Theme.Bg,
+        -- BorderCover: sits exactly over sidebarBorder (right edge of btnFrame, 1px wide)
+        -- inactive → same color as sidebarBorder (invisible blend)
+        -- active   → Theme.Bg (hides the line, tab merges with content)
+        local borderCover = New("Frame", {
+            AnchorPoint      = Vector2.new(1, 0),
+            Position         = UDim2.new(1, 0, 0, 0),
+            Size             = UDim2.new(0, 1, 1, 0),
+            BackgroundColor3 = Theme.BorderDim,
             BorderSizePixel  = 0,
-            ZIndex  = 6,
-            Visible = false,
-            Parent  = btnFrame,
+            ZIndex           = 5,
+            Parent           = btnFrame,
         })
-        Tab.MergeBar = mergeBar
+        Tab.BorderCover = borderCover
 
         local btn = New("TextButton", {
             Size = UDim2.fromScale(1,1), BackgroundTransparency=1, Text="", Parent=btnFrame,
