@@ -751,8 +751,8 @@ function Library:CreateWindow(opts)
         Tab.Left  = makeCol(0,  12)
         Tab.Right = makeCol(.5,  8)
 
-        if not Win.ActiveTab then selectTab(Tab) end
         table.insert(Win.Tabs, Tab)
+        if not Win.ActiveTab then selectTab(Tab) end
 
         -- ─── CreateGroup ─────────────────────────────
         function Tab:CreateGroup(groupOpts)
