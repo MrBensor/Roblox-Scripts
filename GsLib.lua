@@ -3,7 +3,7 @@
     ───────────────────────────────────────────────────────────────────
     Keine Cheat-Logik. Reines GUI-Framework.
 
-    local Lib    = loadstring(readfile("GsLib.lua"))()
+    local Lib    = loadstring(game:HttpGet('https://raw.githubusercontent.com/MrBensor/Roblox-Scripts/refs/heads/main/GsLib.lua'))()
     local Window = Lib:CreateWindow({ Title="...", Accent=Color3..., Size=Vector2... })
     Lib:Notify({ Title="ESP", Text="Enabled", Duration=3 })
 
@@ -28,15 +28,16 @@
     Window:Destroy()
 ]]
 
-local UIS     = game:GetService("UserInputService")
-local Tween   = game:GetService("TweenService")
-local Players = game:GetService("Players")
-local LP      = Players.LocalPlayer
+local UIS        = game:GetService("UserInputService")
+local Tween      = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Players    = game:GetService("Players")
+local LP         = Players.LocalPlayer
 
 -- ══════════════════════════════════════════
---   THEME
+--   THEME  (defaults – overridden per window via CreateWindow opts.Theme)
 -- ══════════════════════════════════════════
-local Theme = {
+local ThemeDefaults = {
     Accent      = Color3.fromRGB(180, 90, 255),
     Bg          = Color3.fromRGB(22, 22, 26),
     Sidebar     = Color3.fromRGB(15, 15, 18),
@@ -53,6 +54,8 @@ local Theme = {
     Bold        = Enum.Font.GothamBold,
     Sz          = 13,
 }
+
+local Theme = {}
 
 -- ══════════════════════════════════════════
 --   HELPERS
@@ -453,7 +456,12 @@ end
 -- ══════════════════════════════════════════
 function Library:CreateWindow(opts)
     opts = opts or {}
+    -- apply caller theme over defaults so each script controls its own look
+    for k, v in pairs(ThemeDefaults) do Theme[k] = v end
     if opts.Accent then Theme.Accent = opts.Accent end
+    if opts.Theme  then
+        for k, v in pairs(opts.Theme) do Theme[k] = v end
+    end
     local title  = opts.Title  or "gamesense"
     local sz     = opts.Size   or Vector2.new(720, 510)
 
@@ -478,14 +486,27 @@ function Library:CreateWindow(opts)
         ClipsDescendants = true, Parent = gui,
     })
     Corner(4, main)
-    Stroke(Color3.fromRGB(55,55,65), 1, main)
+    Stroke(Theme.Border, 1, main)
     Win.Main = main
 
-    -- top accent line
-    New("Frame", {
-        Size = UDim2.new(1,0,0,1), BackgroundColor3 = Theme.Accent,
+    -- top rainbow bar (animated)
+    local rainbowBar = New("Frame", {
+        Size = UDim2.new(1, 0, 0, 2),
+        BackgroundColor3 = Color3.new(1, 1, 1),
         BorderSizePixel = 0, ZIndex = 2, Parent = main,
     })
+    local rainbowGrad = New("UIGradient", { Parent = rainbowBar })
+    local rainbowT = 0
+    local rainbowConn = RunService.Heartbeat:Connect(function(dt)
+        rainbowT = (rainbowT + dt * 0.25) % 1
+        local pts = {}
+        for i = 0, 6 do
+            local t = i / 6
+            pts[i + 1] = ColorSequenceKeypoint.new(t, Color3.fromHSV((rainbowT + t * 0.7) % 1, 1, 1))
+        end
+        rainbowGrad.Color = ColorSequence.new(pts)
+    end)
+    table.insert(Win.Conns, rainbowConn)
 
     -- Sidebar
     local sidebar = New("Frame", {
@@ -494,11 +515,12 @@ function Library:CreateWindow(opts)
         BackgroundColor3 = Theme.Sidebar, BorderSizePixel = 0, Parent = main,
     })
     -- right border of sidebar
-    New("Frame", {
+    local sidebarBorder = New("Frame", {
         AnchorPoint = Vector2.new(1,0), Position = UDim2.new(1,0,0,0),
         Size = UDim2.new(0,1,1,0), BackgroundColor3 = Theme.BorderDim,
-        BorderSizePixel = 0, Parent = sidebar,
+        BorderSizePixel = 0, ZIndex = 2, Parent = sidebar,
     })
+    Win._SidebarBorder = sidebarBorder
     -- title at very top of sidebar (drag area)
     local sideTitle = New("Frame", {
         Size = UDim2.new(1,0,0,36), BackgroundTransparency = 1, Parent = sidebar,
@@ -578,11 +600,16 @@ function Library:CreateWindow(opts)
     -- Tab selection
     local function selectTab(tab)
         for _, t in ipairs(Win.Tabs) do
-            t.Page.Visible = (t == tab)
-            -- sidebar button: accent bar wenn aktiv
-            t.SideBar.BackgroundColor3 = (t == tab) and Theme.Accent or Color3.fromRGB(0,0,0)
-            t.SideBar.BackgroundTransparency = (t == tab) and 0 or 1
-            t.Btn.TextColor3 = (t == tab) and Theme.Text or Theme.Dim
+            local active = (t == tab)
+            t.Page.Visible = active
+            -- left accent bar
+            t.SideBar.BackgroundColor3 = active and Theme.Accent or Color3.fromRGB(0,0,0)
+            t.SideBar.BackgroundTransparency = active and 0 or 1
+            -- tab text
+            if t.Btn then t.Btn.TextColor3 = active and Theme.Text or Theme.Dim end
+            -- merge: active tab covers the sidebar right border with bg color
+            t.MergeBar.Visible = active
+            t.MergeBar.BackgroundColor3 = Theme.Bg
         end
         Win.ActiveTab = tab
         Win.CloseOverlays()
@@ -627,20 +654,37 @@ function Library:CreateWindow(opts)
                 TextColor3 = Theme.Dim, Parent = iconFrame,
             })
         end
+        -- merge bar: covers sidebar right border when this tab is active
+        local mergeBar = New("Frame", {
+            AnchorPoint = Vector2.new(1, 0),
+            Position    = UDim2.new(1, 1, 0, 0),
+            Size        = UDim2.new(0, 2, 1, 0),
+            BackgroundColor3 = Theme.Bg,
+            BorderSizePixel  = 0,
+            ZIndex  = 6,
+            Visible = false,
+            Parent  = btnFrame,
+        })
+        Tab.MergeBar = mergeBar
+
         local btn = New("TextButton", {
             Size = UDim2.fromScale(1,1), BackgroundTransparency=1, Text="", Parent=btnFrame,
         })
-        Tab.Btn    = iconFrame:FindFirstChildOfClass("TextLabel") or iconFrame:FindFirstChildOfClass("ImageLabel")
+        Tab.Btn     = iconFrame:FindFirstChildOfClass("TextLabel") or iconFrame:FindFirstChildOfClass("ImageLabel")
         Tab.SideBar = acBar
 
-        -- tooltip on hover
+        -- hover: smooth bg fade + text color tween
         btn.MouseEnter:Connect(function()
-            tw(hovBg, .1, { BackgroundTransparency = 0.85 })
-            if Tab.Btn then Tab.Btn.TextColor3 = Theme.Text end
+            tw(hovBg, .12, { BackgroundTransparency = 0.82 })
+            if Win.ActiveTab ~= Tab and Tab.Btn then
+                tw(Tab.Btn, .12, { TextColor3 = Theme.Text })
+            end
         end)
         btn.MouseLeave:Connect(function()
-            tw(hovBg, .1, { BackgroundTransparency = 1 })
-            if Win.ActiveTab ~= Tab and Tab.Btn then Tab.Btn.TextColor3 = Theme.Dim end
+            tw(hovBg, .12, { BackgroundTransparency = 1 })
+            if Win.ActiveTab ~= Tab and Tab.Btn then
+                tw(Tab.Btn, .12, { TextColor3 = Theme.Dim })
+            end
         end)
         btn.MouseButton1Click:Connect(function() selectTab(Tab) end)
 
