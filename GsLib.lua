@@ -486,9 +486,11 @@ function Library:CreateWindow(opts)
     gui.Parent  = getParent()
     Win.Gui     = gui
 
-    -- double border: outer frame (black fill + bright outer line)
-    -- moves with main during drag
-    -- outer frame: black stripe + 1px bright line on outer edge
+    -- double border (sharp corners – gamesense look, no rounding so the
+    -- rainbow bar lines up flush with the border instead of poking past it):
+    --   outer frame = black stripe (OuterBg fill) + 2px bright outer line
+    --   inner frame = 2px bright inner line  → both lines equal thickness,
+    --   ~3px black stripe shows between them (5px gap − 2px inner stroke).
     local outerBorder = New("Frame", {
         Name = "OuterBorder",
         Size = UDim2.fromOffset(sz.X + 10, sz.Y + 10),
@@ -497,11 +499,9 @@ function Library:CreateWindow(opts)
         BorderSizePixel = 0,
         Parent = gui,
     })
-    Corner(6, outerBorder)
-    Stroke(Theme.Border, 1, outerBorder)
+    Stroke(Theme.Border, 2, outerBorder)
     Win.OuterBorder = outerBorder
 
-    -- inner frame: 2px bright inner line (same thickness as rainbow bar)
     local main = New("Frame", {
         Name = "Main",
         Size = UDim2.fromOffset(sz.X, sz.Y),
@@ -509,7 +509,6 @@ function Library:CreateWindow(opts)
         BackgroundColor3 = Theme.Bg, BorderSizePixel = 0,
         ClipsDescendants = true, Parent = gui,
     })
-    Corner(4, main)
     Stroke(Theme.Border, 2, main)
     Win.Main = main
 
@@ -534,11 +533,13 @@ function Library:CreateWindow(opts)
         Size = UDim2.new(0, 54, 1, 0),
         BackgroundColor3 = Theme.Sidebar, BorderSizePixel = 0, Parent = main,
     })
-    -- right border of sidebar
+    -- right border of sidebar – ZIndex 1 so the tab list (ZIndex 2) renders
+    -- ABOVE it; otherwise this single sibling frame draws over the whole tab
+    -- list and the active tab's BorderCover could never hide its segment.
     local sidebarBorder = New("Frame", {
         AnchorPoint = Vector2.new(1,0), Position = UDim2.new(1,0,0,0),
         Size = UDim2.new(0,1,1,0), BackgroundColor3 = Theme.BorderDim,
-        BorderSizePixel = 0, ZIndex = 2, Parent = sidebar,
+        BorderSizePixel = 0, ZIndex = 1, Parent = sidebar,
     })
     Win._SidebarBorder = sidebarBorder
     -- title at very top of sidebar (drag area)
@@ -553,7 +554,7 @@ function Library:CreateWindow(opts)
     })
     local tabList = New("Frame", {
         Size = UDim2.new(1,0,1,-36), Position = UDim2.fromOffset(0,36),
-        BackgroundTransparency = 1, Parent = sidebar,
+        BackgroundTransparency = 1, ZIndex = 2, Parent = sidebar,
     })
     List(Enum.FillDirection.Vertical, 2, Enum.HorizontalAlignment.Center,
          Enum.VerticalAlignment.Top, tabList)
