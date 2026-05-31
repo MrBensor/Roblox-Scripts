@@ -35,24 +35,33 @@ local Players    = game:GetService("Players")
 local LP         = Players.LocalPlayer
 
 -- ══════════════════════════════════════════
---   THEME  (defaults – overridden per window via CreateWindow opts.Theme)
+--   THEME  (neutral fallbacks only – all real visuals come from opts.Theme)
 -- ══════════════════════════════════════════
 local ThemeDefaults = {
-    Accent      = Color3.fromRGB(180, 90, 255),
-    Bg          = Color3.fromRGB(22, 22, 26),
-    Sidebar     = Color3.fromRGB(15, 15, 18),
-    Panel       = Color3.fromRGB(28, 28, 33),
-    Elem        = Color3.fromRGB(36, 36, 42),
-    ElemHov     = Color3.fromRGB(46, 46, 54),
-    Border      = Color3.fromRGB(48, 48, 56),
-    BorderDim   = Color3.fromRGB(30, 30, 36),
-    Text        = Color3.fromRGB(210, 210, 215),
-    Dim         = Color3.fromRGB(128, 128, 138),
-    Muted       = Color3.fromRGB(78, 78, 90),
-    CheckOff    = Color3.fromRGB(40, 40, 50),
+    -- colors
+    Accent      = Color3.fromRGB(150, 150, 160),
+    Bg          = Color3.fromRGB(20, 20, 22),
+    OuterBg     = Color3.fromRGB(5, 5, 7),
+    Sidebar     = Color3.fromRGB(14, 14, 16),
+    Panel       = Color3.fromRGB(26, 26, 28),
+    Elem        = Color3.fromRGB(34, 34, 36),
+    ElemHov     = Color3.fromRGB(44, 44, 46),
+    Border      = Color3.fromRGB(50, 50, 55),
+    BorderDim   = Color3.fromRGB(28, 28, 32),
+    Text        = Color3.fromRGB(200, 200, 200),
+    Dim         = Color3.fromRGB(110, 110, 115),
+    Muted       = Color3.fromRGB(70, 70, 75),
+    CheckOff    = Color3.fromRGB(38, 38, 42),
+    -- typography
     Font        = Enum.Font.Gotham,
     Bold        = Enum.Font.GothamBold,
     Sz          = 13,
+    -- top bar: table of Color3 values, built into a ColorSequence left→right
+    -- override in opts.Theme to change the top bar look
+    TopBarColors = {
+        Color3.fromRGB(120, 120, 140),
+        Color3.fromRGB(90,  90, 110),
+    },
 }
 
 local Theme = {}
@@ -477,7 +486,21 @@ function Library:CreateWindow(opts)
     gui.Parent  = getParent()
     Win.Gui     = gui
 
-    -- Main
+    -- double border: outer frame (black fill + bright outer line)
+    -- moves with main during drag
+    local outerBorder = New("Frame", {
+        Name = "OuterBorder",
+        Size = UDim2.fromOffset(sz.X + 4, sz.Y + 4),
+        Position = UDim2.new(.5, -sz.X/2 - 2, .5, -sz.Y/2 - 2),
+        BackgroundColor3 = Theme.OuterBg,
+        BorderSizePixel = 0,
+        Parent = gui,
+    })
+    Corner(5, outerBorder)
+    Stroke(Theme.Border, 1, outerBorder)
+    Win.OuterBorder = outerBorder
+
+    -- Main (inner frame = inner bright line via Stroke)
     local main = New("Frame", {
         Name = "Main",
         Size = UDim2.fromOffset(sz.X, sz.Y),
@@ -486,27 +509,23 @@ function Library:CreateWindow(opts)
         ClipsDescendants = true, Parent = gui,
     })
     Corner(4, main)
-    Stroke(Theme.Border, 1, main)
+    Stroke(Theme.BorderDim, 1, main)
     Win.Main = main
 
-    -- top rainbow bar (animated)
+    -- top bar: colors come entirely from Theme.TopBarColors
     local rainbowBar = New("Frame", {
         Size = UDim2.new(1, 0, 0, 2),
         BackgroundColor3 = Color3.new(1, 1, 1),
         BorderSizePixel = 0, ZIndex = 2, Parent = main,
     })
-    local rainbowGrad = New("UIGradient", { Parent = rainbowBar })
-    local rainbowT = 0
-    local rainbowConn = RunService.Heartbeat:Connect(function(dt)
-        rainbowT = (rainbowT + dt * 0.25) % 1
-        local pts = {}
-        for i = 0, 6 do
-            local t = i / 6
-            pts[i + 1] = ColorSequenceKeypoint.new(t, Color3.fromHSV((rainbowT + t * 0.7) % 1, 1, 1))
+    do
+        local cols = Theme.TopBarColors
+        local pts  = {}
+        for i, c in ipairs(cols) do
+            pts[i] = ColorSequenceKeypoint.new((i - 1) / math.max(#cols - 1, 1), c)
         end
-        rainbowGrad.Color = ColorSequence.new(pts)
-    end)
-    table.insert(Win.Conns, rainbowConn)
+        New("UIGradient", { Color = ColorSequence.new(pts), Parent = rainbowBar })
+    end
 
     -- Sidebar
     local sidebar = New("Frame", {
@@ -555,7 +574,14 @@ function Library:CreateWindow(opts)
         for _, c in ipairs(overlay:GetChildren()) do c:Destroy() end
     end
 
-    -- Drag (sidebar header + content top)
+    local function syncBorder(mainPos)
+        outerBorder.Position = UDim2.new(
+            mainPos.X.Scale, mainPos.X.Offset - 2,
+            mainPos.Y.Scale, mainPos.Y.Offset - 2
+        )
+    end
+
+    -- Drag (sidebar header drags both main and outerBorder)
     do
         local drag, ds, sp = false, nil, nil
         local function startDrag(i)
@@ -567,7 +593,9 @@ function Library:CreateWindow(opts)
         local mc = UIS.InputChanged:Connect(function(i)
             if drag and i.UserInputType == Enum.UserInputType.MouseMovement then
                 local d = i.Position - ds
-                main.Position = UDim2.new(sp.X.Scale, sp.X.Offset+d.X, sp.Y.Scale, sp.Y.Offset+d.Y)
+                local newPos = UDim2.new(sp.X.Scale, sp.X.Offset+d.X, sp.Y.Scale, sp.Y.Offset+d.Y)
+                main.Position = newPos
+                syncBorder(newPos)
             end
         end)
         local ec = UIS.InputEnded:Connect(function(i)
@@ -582,6 +610,7 @@ function Library:CreateWindow(opts)
         if i.KeyCode == Win.ToggleKey then
             Win.Visible = not Win.Visible
             main.Visible = Win.Visible
+            outerBorder.Visible = Win.Visible
             if not Win.Visible then Win.CloseOverlays() end
         end
     end))
@@ -589,7 +618,9 @@ function Library:CreateWindow(opts)
     function Win:SetToggleKey(k) Win.ToggleKey = k end
     function Win:Toggle(s)
         if s == nil then s = not Win.Visible end
-        Win.Visible = s; main.Visible = s
+        Win.Visible = s
+        main.Visible = s
+        outerBorder.Visible = s
         if not s then Win.CloseOverlays() end
     end
     function Win:Destroy()
@@ -607,9 +638,10 @@ function Library:CreateWindow(opts)
             t.SideBar.BackgroundTransparency = active and 0 or 1
             -- tab text
             if t.Btn then t.Btn.TextColor3 = active and Theme.Text or Theme.Dim end
-            -- merge: active tab covers the sidebar right border with bg color
+            -- active bg fill = same as main content bg → tab merges with panel
+            t.ActiveBg.BackgroundTransparency = active and 0 or 1
+            -- merge strip covers the 1px sidebar border line
             t.MergeBar.Visible = active
-            t.MergeBar.BackgroundColor3 = Theme.Bg
         end
         Win.ActiveTab = tab
         Win.CloseOverlays()
@@ -625,15 +657,21 @@ function Library:CreateWindow(opts)
         local btnFrame = New("Frame", {
             Size = UDim2.new(1,0,0,44), BackgroundTransparency = 1, Parent = tabList,
         })
+        -- active bg: same color as content area → tab visually merges with panel
+        local activeBg = New("Frame", {
+            Size = UDim2.fromScale(1,1), BackgroundColor3 = Theme.Bg,
+            BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 1, Parent = btnFrame,
+        })
+        Tab.ActiveBg = activeBg
         -- accent bar on left edge (active indicator)
         local acBar = New("Frame", {
             Size = UDim2.new(0,2,1,0), BackgroundColor3 = Theme.Accent,
-            BorderSizePixel = 0, BackgroundTransparency = 1, Parent = btnFrame,
+            BorderSizePixel = 0, BackgroundTransparency = 1, ZIndex = 3, Parent = btnFrame,
         })
         -- hover bg
         local hovBg = New("Frame", {
             Size = UDim2.fromScale(1,1), BackgroundColor3 = Theme.Elem,
-            BackgroundTransparency = 1, BorderSizePixel = 0, Parent = btnFrame,
+            BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 2, Parent = btnFrame,
         })
         -- icon or abbrev
         local iconFrame = New("Frame", {
@@ -697,8 +735,8 @@ function Library:CreateWindow(opts)
 
         local function makeCol(xScale, xOff)
             local col = New("ScrollingFrame", {
-                Size = UDim2.new(.5,-5,1,-8),
-                Position = UDim2.new(xScale, xOff, 0, 6),
+                Size = UDim2.new(.5, -14, 1, -10),
+                Position = UDim2.new(xScale, xOff, 0, 8),
                 BackgroundTransparency=1, BorderSizePixel=0,
                 ScrollBarThickness=3, ScrollBarImageColor3=Theme.Accent,
                 CanvasSize=UDim2.new(0,0,0,0), AutomaticCanvasSize=Enum.AutomaticSize.Y,
@@ -708,8 +746,10 @@ function Library:CreateWindow(opts)
                  Enum.VerticalAlignment.Top, col)
             return col
         end
-        Tab.Left  = makeCol(0,   4)
-        Tab.Right = makeCol(.5,  2)
+        -- left col: 12px from content left edge (away from sidebar)
+        -- right col: 50%+8px start → 8px gap between the two columns
+        Tab.Left  = makeCol(0,  12)
+        Tab.Right = makeCol(.5,  8)
 
         if not Win.ActiveTab then selectTab(Tab) end
         table.insert(Win.Tabs, Tab)
