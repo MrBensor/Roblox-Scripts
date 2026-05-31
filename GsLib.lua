@@ -646,6 +646,8 @@ function Library:CreateWindow(opts)
             -- active → Theme.Bg (same as content, hides the line)
             -- inactive → Theme.BorderDim (same as the line, invisible)
             t.BorderCover.BackgroundColor3 = active and Theme.Bg or Theme.BorderDim
+            t.TopLine.BackgroundTransparency = active and 0 or 1
+            t.BotLine.BackgroundTransparency = active and 0 or 1
         end
         Win.ActiveTab = tab
         Win.CloseOverlays()
@@ -709,6 +711,24 @@ function Library:CreateWindow(opts)
             Parent           = btnFrame,
         })
         Tab.BorderCover = borderCover
+
+        -- top and bottom separator lines – only visible on the active tab
+        local topLine = New("Frame", {
+            Size = UDim2.new(1, 0, 0, 1),
+            BackgroundColor3 = Theme.BorderDim,
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0, ZIndex = 4, Parent = btnFrame,
+        })
+        local botLine = New("Frame", {
+            Size = UDim2.new(1, 0, 0, 1),
+            AnchorPoint = Vector2.new(0, 1),
+            Position = UDim2.new(0, 0, 1, 0),
+            BackgroundColor3 = Theme.BorderDim,
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0, ZIndex = 4, Parent = btnFrame,
+        })
+        Tab.TopLine = topLine
+        Tab.BotLine = botLine
 
         local btn = New("TextButton", {
             Size = UDim2.fromScale(1,1), BackgroundTransparency=1, Text="", Parent=btnFrame,
