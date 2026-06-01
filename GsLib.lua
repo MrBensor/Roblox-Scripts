@@ -625,6 +625,15 @@ function Library:CreateWindow(opts)
         outerBorder.Visible = s
         if not s then Win.CloseOverlays() end
     end
+    function Win:SetAccent(c)
+        Theme.Accent = c
+        -- update the most visible accent elements that are already rendered
+        for _, t in ipairs(Win.Tabs) do
+            if Win.ActiveTab == t then
+                t.SideBar.BackgroundColor3 = c
+            end
+        end
+    end
     function Win:Destroy()
         for _, c in ipairs(Win.Conns) do pcall(function() c:Disconnect() end) end
         pcall(function() gui:Destroy() end)
