@@ -1,31 +1,7 @@
 --[[
     GsLib v2 – GameSense/Skeet-style UI Framework for Roblox executors
-    ───────────────────────────────────────────────────────────────────
-    Keine Cheat-Logik. Reines GUI-Framework.
-
-    local Lib    = loadstring(game:HttpGet('https://raw.githubusercontent.com/MrBensor/Roblox-Scripts/refs/heads/main/GsLib.lua'))()
-    local Window = Lib:CreateWindow({ Title="...", Accent=Color3..., Size=Vector2... })
-    Lib:Notify({ Title="ESP", Text="Enabled", Duration=3 })
-
-    local Tab = Window:CreateTab({ Name="Visuals", Icon=0 })   -- Icon = optional asset id
-    local G   = Tab:CreateGroup({ Name="Player ESP", Side="Left" })
-
-    G:AddSection("Category")
-    local t = G:AddToggle({ Text="Enable", Default=false, Callback=function(v) end })
-    t:AddColorPicker({ Default=Color3.new(1,0,0), Callback=function(c,a) end })
-    t:AddKeybind({ Default=Enum.KeyCode.E, Callback=function(active) end })
-    G:AddSlider({ Text="FOV", Min=0, Max=180, Default=90, Suffix="°", Callback=function(v) end })
-    G:AddDropdown({ Text="Mode", Options={"A","B"}, Default="A", Callback=function(v) end })
-    G:AddDropdown({ Text="Flags", Options={"X","Y"}, Multi=true, Callback=function(t) end })
-    G:AddColorPicker({ Text="Color", Default=Color3.new(1,0,0), Callback=function(c,a) end })
-    G:AddKeybind({ Text="Bind", Default=Enum.KeyCode.F, Callback=function(active) end })
-    G:AddButton({ Text="Click", Callback=function() end })
-    G:AddLabel("Text here")
-    G:AddParagraph({ Title="Title", Text="Multi\nLine..." })
-    G:AddInput({ Text="Name", Placeholder="...", Callback=function(s) end })
-
-    Window:SetToggleKey(Enum.KeyCode.Insert)
-    Window:Destroy()
+    Modified for Operation One: legend-style group headers, no small corners,
+    slider +/- buttons, floating value label, white section text.
 ]]
 
 local UIS        = game:GetService("UserInputService")
@@ -34,11 +10,7 @@ local RunService = game:GetService("RunService")
 local Players    = game:GetService("Players")
 local LP         = Players.LocalPlayer
 
--- ══════════════════════════════════════════
---   THEME  (neutral fallbacks only – all real visuals come from opts.Theme)
--- ══════════════════════════════════════════
 local ThemeDefaults = {
-    -- colors
     Accent      = Color3.fromRGB(150, 150, 160),
     Bg          = Color3.fromRGB(20, 20, 22),
     OuterBg     = Color3.fromRGB(5, 5, 7),
@@ -52,12 +24,9 @@ local ThemeDefaults = {
     Dim         = Color3.fromRGB(110, 110, 115),
     Muted       = Color3.fromRGB(70, 70, 75),
     CheckOff    = Color3.fromRGB(38, 38, 42),
-    -- typography
     Font        = Enum.Font.Gotham,
     Bold        = Enum.Font.GothamBold,
     Sz          = 13,
-    -- top bar: table of Color3 values, built into a ColorSequence left→right
-    -- override in opts.Theme to change the top bar look
     TopBarColors = {
         Color3.fromRGB(120, 120, 140),
         Color3.fromRGB(90,  90, 110),
@@ -66,9 +35,6 @@ local ThemeDefaults = {
 
 local Theme = {}
 
--- ══════════════════════════════════════════
---   HELPERS
--- ══════════════════════════════════════════
 local function New(class, props, children)
     local o = Instance.new(class)
     if props then
@@ -95,7 +61,10 @@ local function Stroke(color, thick, parent)
     })
 end
 
+-- r < 3: no corner (buttons, sliders, dropdowns stay sharp)
+-- r >= 3: keep corner (group boxes, popups, window)
 local function Corner(r, parent)
+    if r < 3 then return end
     return New("UICorner", { CornerRadius = UDim.new(0, r), Parent = parent })
 end
 
@@ -127,7 +96,7 @@ local function tw(inst, time, props)
 end
 
 -- ══════════════════════════════════════════
---   NOTIFICATIONS  (independiente ScreenGui)
+--   NOTIFICATIONS
 -- ══════════════════════════════════════════
 local NotifGui = New("ScreenGui", {
     Name = "GsLib_Notif",
@@ -165,7 +134,6 @@ function Library:Notify(o)
     })
     Corner(3, toast)
     Stroke(Theme.Accent, 1, toast)
-    -- left accent bar
     New("Frame", {
         Size = UDim2.new(0, 2, 1, 0),
         BackgroundColor3 = Theme.Accent,
@@ -212,7 +180,7 @@ function Library:Notify(o)
 end
 
 -- ══════════════════════════════════════════
---   COLORPICKER  (popup)
+--   COLORPICKER
 -- ══════════════════════════════════════════
 local function mountColorPicker(holder, o, Win)
     o = o or {}
@@ -252,7 +220,6 @@ local function mountColorPicker(holder, o, Win)
         if px < 0 then px = ap.X - mp.X end
         pop.Position = UDim2.fromOffset(px, ap.Y - mp.Y + 14)
 
-        -- SV box
         local sv = New("ImageButton", {
             Size = UDim2.fromOffset(140, 120), Position = UDim2.fromOffset(8, 8),
             BackgroundColor3 = Color3.fromHSV(h, 1, 1),
@@ -284,7 +251,6 @@ local function mountColorPicker(holder, o, Win)
         local function updateCur() cur.Position = UDim2.new(s, 0, 1 - v, 0) end
         updateCur()
 
-        -- Hue
         local hueBar = New("ImageButton", {
             Size = UDim2.fromOffset(14, 120), Position = UDim2.fromOffset(156, 8),
             BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 71, Parent = pop,
@@ -465,7 +431,6 @@ end
 -- ══════════════════════════════════════════
 function Library:CreateWindow(opts)
     opts = opts or {}
-    -- apply caller theme over defaults so each script controls its own look
     for k, v in pairs(ThemeDefaults) do Theme[k] = v end
     if opts.Accent then Theme.Accent = opts.Accent end
     if opts.Theme  then
@@ -486,11 +451,6 @@ function Library:CreateWindow(opts)
     gui.Parent  = getParent()
     Win.Gui     = gui
 
-    -- double border (sharp corners – gamesense look, no rounding so the
-    -- rainbow bar lines up flush with the border instead of poking past it):
-    --   outer frame = black stripe (OuterBg fill) + 2px bright outer line
-    --   inner frame = 2px bright inner line  → both lines equal thickness,
-    --   ~3px black stripe shows between them (5px gap − 2px inner stroke).
     local outerBorder = New("Frame", {
         Name = "OuterBorder",
         Size = UDim2.fromOffset(sz.X + 10, sz.Y + 10),
@@ -512,7 +472,6 @@ function Library:CreateWindow(opts)
     Stroke(Theme.Border, 2, main)
     Win.Main = main
 
-    -- top bar: colors come entirely from Theme.TopBarColors
     local rainbowBar = New("Frame", {
         Size = UDim2.new(1, 0, 0, 2),
         BackgroundColor3 = Color3.new(1, 1, 1),
@@ -527,22 +486,17 @@ function Library:CreateWindow(opts)
         New("UIGradient", { Color = ColorSequence.new(pts), Parent = rainbowBar })
     end
 
-    -- Sidebar
     local sidebar = New("Frame", {
         Name = "Sidebar",
         Size = UDim2.new(0, 54, 1, 0),
         BackgroundColor3 = Theme.Sidebar, BorderSizePixel = 0, Parent = main,
     })
-    -- right border of sidebar – ZIndex 1 so the tab list (ZIndex 2) renders
-    -- ABOVE it; otherwise this single sibling frame draws over the whole tab
-    -- list and the active tab's BorderCover could never hide its segment.
     local sidebarBorder = New("Frame", {
         AnchorPoint = Vector2.new(1,0), Position = UDim2.new(1,0,0,0),
         Size = UDim2.new(0,1,1,0), BackgroundColor3 = Theme.BorderDim,
         BorderSizePixel = 0, ZIndex = 1, Parent = sidebar,
     })
     Win._SidebarBorder = sidebarBorder
-    -- title at very top of sidebar (drag area)
     local sideTitle = New("Frame", {
         Size = UDim2.new(1,0,0,36), BackgroundTransparency = 1, Parent = sidebar,
     })
@@ -559,7 +513,6 @@ function Library:CreateWindow(opts)
     List(Enum.FillDirection.Vertical, 2, Enum.HorizontalAlignment.Center,
          Enum.VerticalAlignment.Top, tabList)
 
-    -- Content area
     local content = New("Frame", {
         Name = "Content",
         Size = UDim2.new(1,-55,1,0), Position = UDim2.fromOffset(55,0),
@@ -567,7 +520,6 @@ function Library:CreateWindow(opts)
     })
     Win.Content = content
 
-    -- Overlay for popups
     local overlay = New("Frame", {
         Size = UDim2.fromScale(1,1), BackgroundTransparency=1, ZIndex=50, Parent=main,
     })
@@ -583,7 +535,6 @@ function Library:CreateWindow(opts)
         )
     end
 
-    -- Drag (sidebar header drags both main and outerBorder)
     do
         local drag, ds, sp = false, nil, nil
         local function startDrag(i)
@@ -606,7 +557,6 @@ function Library:CreateWindow(opts)
         table.insert(Win.Conns, mc); table.insert(Win.Conns, ec)
     end
 
-    -- Toggle key
     table.insert(Win.Conns, UIS.InputBegan:Connect(function(i, gpe)
         if gpe then return end
         if i.KeyCode == Win.ToggleKey then
@@ -627,7 +577,6 @@ function Library:CreateWindow(opts)
     end
     function Win:SetAccent(c)
         Theme.Accent = c
-        -- update the most visible accent elements that are already rendered
         for _, t in ipairs(Win.Tabs) do
             if Win.ActiveTab == t then
                 t.SideBar.BackgroundColor3 = c
@@ -639,21 +588,14 @@ function Library:CreateWindow(opts)
         pcall(function() gui:Destroy() end)
     end
 
-    -- Tab selection
     local function selectTab(tab)
         for _, t in ipairs(Win.Tabs) do
             local active = (t == tab)
             t.Page.Visible = active
-            -- left accent bar
             t.SideBar.BackgroundColor3 = active and Theme.Accent or Color3.fromRGB(0,0,0)
             t.SideBar.BackgroundTransparency = active and 0 or 1
-            -- tab text
             if t.Btn then t.Btn.TextColor3 = active and Theme.Text or Theme.Dim end
-            -- active bg fill = same as content bg so tab blends in
             t.ActiveBg.BackgroundTransparency = active and 0 or 1
-            -- BorderCover sits over the sidebarBorder segment for this tab:
-            -- active → Theme.Bg (same as content, hides the line)
-            -- inactive → Theme.BorderDim (same as the line, invisible)
             t.BorderCover.BackgroundColor3 = active and Theme.Bg or Theme.BorderDim
             t.TopLine.BackgroundTransparency = active and 0 or 1
             t.BotLine.BackgroundTransparency = active and 0 or 1
@@ -662,33 +604,27 @@ function Library:CreateWindow(opts)
         Win.CloseOverlays()
     end
 
-    -- ─── CreateTab ───────────────────────────────────
     function Win:CreateTab(tabOpts)
         tabOpts = tabOpts or {}
         local name = tabOpts.Name or "Tab"
         local Tab = { Win = Win }
 
-        -- sidebar button
         local btnFrame = New("Frame", {
             Size = UDim2.new(1,0,0,44), BackgroundTransparency = 1, Parent = tabList,
         })
-        -- active bg: same color as content area → tab visually merges with panel
         local activeBg = New("Frame", {
             Size = UDim2.fromScale(1,1), BackgroundColor3 = Theme.Bg,
             BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 1, Parent = btnFrame,
         })
         Tab.ActiveBg = activeBg
-        -- accent bar on left edge (active indicator)
         local acBar = New("Frame", {
             Size = UDim2.new(0,2,1,0), BackgroundColor3 = Theme.Accent,
             BorderSizePixel = 0, BackgroundTransparency = 1, ZIndex = 3, Parent = btnFrame,
         })
-        -- hover bg
         local hovBg = New("Frame", {
             Size = UDim2.fromScale(1,1), BackgroundColor3 = Theme.Elem,
             BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 2, Parent = btnFrame,
         })
-        -- icon or abbrev
         local iconFrame = New("Frame", {
             Size = UDim2.fromScale(1,1), BackgroundTransparency = 1, Parent = btnFrame,
         })
@@ -707,9 +643,6 @@ function Library:CreateWindow(opts)
                 TextColor3 = Theme.Dim, Parent = iconFrame,
             })
         end
-        -- BorderCover: sits exactly over sidebarBorder (right edge of btnFrame, 1px wide)
-        -- inactive → same color as sidebarBorder (invisible blend)
-        -- active   → Theme.Bg (hides the line, tab merges with content)
         local borderCover = New("Frame", {
             AnchorPoint      = Vector2.new(1, 0),
             Position         = UDim2.new(1, 0, 0, 0),
@@ -721,7 +654,6 @@ function Library:CreateWindow(opts)
         })
         Tab.BorderCover = borderCover
 
-        -- top and bottom separator lines – only visible on the active tab
         local topLine = New("Frame", {
             Size = UDim2.new(1, 0, 0, 1),
             BackgroundColor3 = Theme.BorderDim,
@@ -745,7 +677,6 @@ function Library:CreateWindow(opts)
         Tab.Btn     = iconFrame:FindFirstChildOfClass("TextLabel") or iconFrame:FindFirstChildOfClass("ImageLabel")
         Tab.SideBar = acBar
 
-        -- hover: smooth bg fade + text color tween
         btn.MouseEnter:Connect(function()
             tw(hovBg, .12, { BackgroundTransparency = 0.82 })
             if Win.ActiveTab ~= Tab and Tab.Btn then
@@ -760,7 +691,6 @@ function Library:CreateWindow(opts)
         end)
         btn.MouseButton1Click:Connect(function() selectTab(Tab) end)
 
-        -- page (two columns)
         local page = New("Frame", {
             Size = UDim2.fromScale(1,1), BackgroundTransparency=1,
             Visible=false, Parent=content,
@@ -780,8 +710,6 @@ function Library:CreateWindow(opts)
                  Enum.VerticalAlignment.Top, col)
             return col
         end
-        -- left col: 12px from content left edge (away from sidebar)
-        -- right col: 50%+8px start → 8px gap between the two columns
         Tab.Left  = makeCol(0,  12)
         Tab.Right = makeCol(.5,  8)
 
@@ -800,34 +728,32 @@ function Library:CreateWindow(opts)
             })
             Corner(3, box)
             Stroke(Theme.BorderDim, 1, box)
-            -- accent top line
-            New("Frame", {
-                Size=UDim2.new(1,0,0,1), BackgroundColor3=Theme.Accent,
-                BorderSizePixel=0, ZIndex=2, Parent=box,
-            })
+
+            -- legend-style group name: positioned on the top border, breaks it visually
+            -- background matches sidebar so the border line appears interrupted
             New("TextLabel", {
-                Size=UDim2.new(1,-12,0,22), Position=UDim2.fromOffset(8,4),
-                BackgroundTransparency=1, Font=Theme.Bold, TextSize=12,
-                Text=(groupOpts.Name or "Group"):upper(),
-                TextColor3=Theme.Dim, TextXAlignment=Enum.TextXAlignment.Left,
-                Parent=box,
+                Size=UDim2.new(0,0,0,14), Position=UDim2.new(0,8,0,-7),
+                AutomaticSize=Enum.AutomaticSize.X,
+                BackgroundColor3=Theme.Sidebar, Font=Theme.Bold, TextSize=11,
+                Text=" " .. (groupOpts.Name or "Group"):upper() .. " ",
+                TextColor3=Color3.new(1,1,1), TextXAlignment=Enum.TextXAlignment.Left,
+                ZIndex=4, Parent=box,
             })
+
             local body = New("Frame", {
-                Size=UDim2.new(1,0,0,0), Position=UDim2.fromOffset(0,27),
+                Size=UDim2.new(1,0,0,0), Position=UDim2.fromOffset(0,10),
                 AutomaticSize=Enum.AutomaticSize.Y, BackgroundTransparency=1, Parent=box,
             })
             List(Enum.FillDirection.Vertical, 5, Enum.HorizontalAlignment.Left,
                  Enum.VerticalAlignment.Top, body)
             Pad(0, 8, 8, 8, body)
 
-            -- helper: row frame
             local function row(h)
                 return New("Frame", {
                     Size=UDim2.new(1,0,0,h or 17), BackgroundTransparency=1, Parent=body,
                 })
             end
 
-            -- addon holder (right-aligned, for inline colorpicker/keybind)
             local function addonHolder(parent)
                 local h = New("Frame", {
                     AnchorPoint=Vector2.new(1,.5), Position=UDim2.new(1,0,.5,0),
@@ -840,35 +766,28 @@ function Library:CreateWindow(opts)
             end
 
             -- ═══ SECTION ════════════════════════════
+            -- simple white label, no underline
             function G:AddSection(text)
-                local r = row(20)
+                local r = row(16)
                 New("TextLabel", {
-                    Size=UDim2.new(1,0,.5,0), BackgroundTransparency=1,
+                    Size=UDim2.new(1,0,1,0), BackgroundTransparency=1,
                     Font=Theme.Bold, TextSize=11,
-                    Text=(text or ""):upper(), TextColor3=Theme.Accent,
+                    Text=(text or ""):upper(), TextColor3=Color3.new(1,1,1),
                     TextXAlignment=Enum.TextXAlignment.Left, Parent=r,
-                })
-                New("Frame", {
-                    AnchorPoint=Vector2.new(0,1), Position=UDim2.new(0,0,1,0),
-                    Size=UDim2.new(1,0,0,1), BackgroundColor3=Theme.BorderDim,
-                    BorderSizePixel=0, Parent=r,
                 })
             end
 
             -- ═══ TOGGLE ═════════════════════════════
-            -- KEY visual: small solid filled square (8x8, sharp corners)
             function G:AddToggle(o)
                 o = o or {}
                 local T2 = { Value = o.Default or false }
                 local r = row(17)
 
-                -- THE square indicator
                 local sq = New("Frame", {
                     Size=UDim2.fromOffset(8,8), Position=UDim2.fromOffset(0,4),
                     BackgroundColor3 = T2.Value and Theme.Accent or Theme.CheckOff,
                     BorderSizePixel=0, Parent=r,
                 })
-                -- NO corner radius – sharp GameSense squares
 
                 local lbl2 = New("TextLabel", {
                     BackgroundTransparency=1, Position=UDim2.fromOffset(14,0),
@@ -888,7 +807,6 @@ function Library:CreateWindow(opts)
 
                 function T2:Set(vv)
                     T2.Value = vv
-                    -- instant color swap – no fade, matches the "clearly on/off" look
                     sq.BackgroundColor3 = vv and Theme.Accent or Theme.CheckOff
                     lbl2.TextColor3     = vv and Theme.Text or Theme.Dim
                     if o.Callback then pcall(o.Callback, vv) end
@@ -914,7 +832,7 @@ function Library:CreateWindow(opts)
                 local dec     = o.Decimals or 0
                 local S = { Value = math.clamp(o.Default or mn, mn, mx) }
 
-                local r = row(28)
+                local r = row(32)
                 local top = New("Frame", {Size=UDim2.new(1,0,0,13), BackgroundTransparency=1, Parent=r})
                 New("TextLabel", {
                     BackgroundTransparency=1, Size=UDim2.new(1,-50,1,0),
@@ -927,16 +845,36 @@ function Library:CreateWindow(opts)
                     Font=Theme.Font, TextSize=Theme.Sz, TextColor3=Theme.Text,
                     TextXAlignment=Enum.TextXAlignment.Right, Parent=top,
                 })
+                -- minus button (left of track)
+                local minusBtn = New("TextButton", {
+                    Size=UDim2.new(0,13,0,12), Position=UDim2.new(0,0,0,15),
+                    BackgroundColor3=Theme.Elem, BorderSizePixel=0,
+                    Text="-", Font=Theme.Bold, TextSize=13, TextColor3=Theme.Text,
+                    AutoButtonColor=false, Parent=r,
+                })
+                -- track (shrunk by 32px to leave room for +/- buttons)
                 local track = New("Frame", {
-                    Size=UDim2.new(1,0,0,3), Position=UDim2.fromOffset(0,18),
+                    Size=UDim2.new(1,-32,0,6), Position=UDim2.fromOffset(16,18),
                     BackgroundColor3=Theme.Elem, BorderSizePixel=0, Parent=r,
                 })
-                Corner(2, track)
                 local fill = New("Frame", {
                     Size=UDim2.fromScale(0,1), BackgroundColor3=Theme.Accent,
                     BorderSizePixel=0, Parent=track,
                 })
-                Corner(2, fill)
+                -- floating value label that moves with fill endpoint
+                local trackLbl = New("TextLabel", {
+                    BackgroundTransparency=1, AnchorPoint=Vector2.new(0.5,0.5),
+                    Position=UDim2.new(0,0,0.5,0), Size=UDim2.fromOffset(38,10),
+                    Font=Theme.Bold, TextSize=8, TextColor3=Color3.new(1,1,1),
+                    ZIndex=5, Parent=track,
+                })
+                -- plus button (right of track)
+                local plusBtn = New("TextButton", {
+                    Size=UDim2.new(0,13,0,12), Position=UDim2.new(1,-13,0,15),
+                    BackgroundColor3=Theme.Elem, BorderSizePixel=0,
+                    Text="+", Font=Theme.Bold, TextSize=13, TextColor3=Theme.Text,
+                    AutoButtonColor=false, Parent=r,
+                })
 
                 local function fmt(vv)
                     if dec>0 then return string.format("%."..dec.."f",vv)..(o.Suffix or "") end
@@ -946,8 +884,11 @@ function Library:CreateWindow(opts)
                     vv = math.clamp(vv, mn, mx)
                     if dec==0 then vv = math.floor(vv+.5) end
                     S.Value = vv
-                    fill.Size = UDim2.fromScale((vv-mn)/(mx-mn), 1)
-                    valLbl.Text = fmt(vv)
+                    local rel = (vv-mn)/(mx-mn)
+                    fill.Size = UDim2.fromScale(rel, 1)
+                    valLbl.Text  = fmt(vv)
+                    trackLbl.Text = fmt(vv)
+                    trackLbl.Position = UDim2.new(math.clamp(rel,0.05,0.95),0,0.5,0)
                     if o.Callback then pcall(o.Callback, vv) end
                 end
                 function S:Get() return S.Value end
@@ -967,6 +908,9 @@ function Library:CreateWindow(opts)
                     if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end
                 end)
                 table.insert(Win.Conns, mc); table.insert(Win.Conns, ec)
+                local _bs = dec>0 and (0.1^dec) or 1
+                minusBtn.MouseButton1Click:Connect(function() S:Set(S.Value - _bs) end)
+                plusBtn.MouseButton1Click:Connect(function()  S:Set(S.Value + _bs) end)
                 S:Set(S.Value)
                 return S
             end
@@ -992,7 +936,6 @@ function Library:CreateWindow(opts)
                     BackgroundColor3=Theme.Elem, BorderSizePixel=0, Text="",
                     AutoButtonColor=false, Parent=r,
                 })
-                Corner(2, boxBtn)
                 Stroke(Theme.BorderDim, 1, boxBtn)
                 local sel = New("TextLabel", {
                     BackgroundTransparency=1, Position=UDim2.fromOffset(5,0),
@@ -1000,10 +943,11 @@ function Library:CreateWindow(opts)
                     TextColor3=Theme.Text, TextXAlignment=Enum.TextXAlignment.Left,
                     TextTruncate=Enum.TextTruncate.AtEnd, Parent=boxBtn,
                 })
+                -- visible arrow indicator
                 New("TextLabel", {
                     BackgroundTransparency=1, AnchorPoint=Vector2.new(1,.5),
                     Position=UDim2.new(1,-4,.5,0), Size=UDim2.fromOffset(10,10),
-                    Font=Theme.Bold, TextSize=11, Text="▾", TextColor3=Theme.Dim, Parent=boxBtn,
+                    Font=Theme.Bold, TextSize=11, Text="▾", TextColor3=Theme.Text, Parent=boxBtn,
                 })
 
                 local function display()
@@ -1126,7 +1070,6 @@ function Library:CreateWindow(opts)
                     Font=Theme.Font, TextSize=Theme.Sz, Text=o.Text or "Button",
                     TextColor3=Theme.Text, Parent=r,
                 })
-                Corner(2, btn2)
                 Stroke(Theme.BorderDim, 1, btn2)
                 btn2.MouseEnter:Connect(function() tw(btn2,.1,{BackgroundColor3=Theme.ElemHov}) end)
                 btn2.MouseLeave:Connect(function() tw(btn2,.1,{BackgroundColor3=Theme.Elem}) end)
