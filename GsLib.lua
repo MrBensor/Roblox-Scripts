@@ -226,12 +226,14 @@ local function mountColorPicker(holder, o, Win)
             AutoButtonColor = false, ZIndex = 55, Parent = Win.Overlay,
         }).MouseButton1Click:Connect(function() Win.CloseOverlays() end)
 
-        local pop = New("Frame", {
+        -- TextButton so clicks on the popup background don't fall through to the close handler
+        local pop = New("TextButton", {
             Size = UDim2.fromOffset(popW, popH),
             BackgroundColor3 = Theme.Panel,
             BorderSizePixel = 0, ZIndex = 70, Parent = Win.Overlay,
+            Text = "", AutoButtonColor = false,
         })
-        Stroke(Theme.IslandBorder, 1, pop)  -- neutral border, no green, no rounding
+        Stroke(Theme.IslandBorder, 1, pop)
 
         -- position: open left of the swatch, clamped fully inside the window
         local ap = swatch.AbsolutePosition
@@ -284,7 +286,7 @@ local function mountColorPicker(holder, o, Win)
         -- ── hue bar (red → … → red) ───────────────
         local hueBar = New("ImageButton", {
             Size = UDim2.fromOffset(HUEW, SVH), Position = UDim2.fromOffset(PAD + SVW + GAP, PAD),
-            BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 71, Parent = pop,
+            BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 71, Parent = pop,
         })
         New("UIGradient", {
             Rotation = 90,
@@ -315,7 +317,7 @@ local function mountColorPicker(holder, o, Win)
                 Size = UDim2.fromOffset(SVW + GAP + HUEW, 10),
                 Position = UDim2.fromOffset(PAD, PAD + SVH + 8),
                 BackgroundColor3 = Color3.fromRGB(20,20,20),
-                BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 71, Parent = pop,
+                BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 71, Parent = pop,
             })
             alphaFrame = New("Frame", {
                 Size = UDim2.fromScale(1,1), BackgroundColor3 = Color3.fromHSV(h,s,v),
