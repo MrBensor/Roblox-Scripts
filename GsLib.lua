@@ -143,8 +143,7 @@ function Library:Notify(o)
         BorderSizePixel = 0,
         Parent = NotifHolder,
     })
-    Corner(3, toast)
-    Stroke(Theme.Accent, 1, toast)
+    Stroke(Theme.IslandBorder, 1, toast)
     New("Frame", {
         Size = UDim2.new(0, 2, 1, 0),
         BackgroundColor3 = Theme.Accent,
@@ -232,8 +231,7 @@ local function mountColorPicker(holder, o, Win)
             BackgroundColor3 = Theme.Panel,
             BorderSizePixel = 0, ZIndex = 70, Parent = Win.Overlay,
         })
-        Corner(3, pop)
-        Stroke(Theme.Accent, 1, pop)
+        Stroke(Theme.IslandBorder, 1, pop)  -- neutral border, no green, no rounding
 
         -- position: open left of the swatch, clamped fully inside the window
         local ap = swatch.AbsolutePosition
@@ -482,7 +480,11 @@ function Library:CreateWindow(opts)
     local sz     = opts.Size   or Vector2.new(720, 510)
 
     local Win   = { Tabs={}, ActiveTab=nil, ToggleKey=opts.ToggleKey or Enum.KeyCode.Insert,
-                    Visible=true, Conns={} }
+                    Visible=true, Conns={}, Accents={} }
+
+    -- every accent-coloured element registers a closure here; SetAccent re-runs them
+    -- so a single accent variable drives the whole UI and is changeable at runtime.
+    local function regAccent(fn) table.insert(Win.Accents, fn); pcall(fn) end
 
     local gui = New("ScreenGui", {
         Name = "GsLib_" .. math.random(1000,9999),
@@ -542,12 +544,13 @@ function Library:CreateWindow(opts)
     local sideTitle = New("Frame", {
         Size = UDim2.new(1,0,0,36), BackgroundTransparency = 1, Parent = sidebar,
     })
-    New("TextLabel", {
+    local sideTitleLbl = New("TextLabel", {
         Size = UDim2.fromScale(1,1), BackgroundTransparency = 1,
         Font = Theme.Bold, TextSize = 11,
         Text = title:upper():sub(1,5),
         TextColor3 = Theme.Accent, Parent = sideTitle,
     })
+    regAccent(function() sideTitleLbl.TextColor3 = Theme.Accent end)
     local tabList = New("Frame", {
         Size = UDim2.new(1,0,1,-36), Position = UDim2.fromOffset(0,36),
         BackgroundTransparency = 1, ZIndex = 2, Parent = sidebar,
@@ -624,20 +627,18 @@ function Library:CreateWindow(opts)
         outerBorder.Visible = s
         if not s then Win.CloseOverlays() end
     end
+    local selectTab  -- forward declaration (SetAccent refreshes the active tab)
     function Win:SetAccent(c)
         Theme.Accent = c
-        for _, t in ipairs(Win.Tabs) do
-            if Win.ActiveTab == t then
-                t.SideBar.BackgroundColor3 = c
-            end
-        end
+        for _, fn in ipairs(Win.Accents) do pcall(fn) end
+        if Win.ActiveTab then selectTab(Win.ActiveTab) end
     end
     function Win:Destroy()
         for _, c in ipairs(Win.Conns) do pcall(function() c:Disconnect() end) end
         pcall(function() gui:Destroy() end)
     end
 
-    local function selectTab(tab)
+    function selectTab(tab)
         for _, t in ipairs(Win.Tabs) do
             local active = (t == tab)
             t.Page.Visible = active
@@ -756,8 +757,10 @@ function Library:CreateWindow(opts)
                 CanvasSize=UDim2.new(0,0,0,0), AutomaticCanvasSize=Enum.AutomaticSize.Y,
                 Parent=page,
             })
-            -- top room so the legend headers (sit at y=-7 on the box border) aren't clipped
-            Pad(10, 10, 0, 4, col)
+            regAccent(function() col.ScrollBarImageColor3 = Theme.Accent end)
+            -- top room so the headers sit on the border without being clipped; left/right
+            -- room so the island side borders aren't cut off by the scroll clip
+            Pad(10, 10, 2, 4, col)
             List(Enum.FillDirection.Vertical, 9, Enum.HorizontalAlignment.Left,
                  Enum.VerticalAlignment.Top, col)
 
@@ -810,23 +813,40 @@ function Library:CreateWindow(opts)
             local parentCol = (groupOpts.Side == "Right") and Tab.Right or Tab.Left
             local G = {}
 
+            -- sharp island (no rounding, no UIStroke); border is drawn as 1px frames
             local box = New("Frame", {
                 Size = UDim2.new(1,0,0,0), AutomaticSize=Enum.AutomaticSize.Y,
                 BackgroundColor3=Theme.Panel, BorderSizePixel=0, Parent=parentCol,
             })
-            Corner(3, box)
-            Stroke(Theme.IslandBorder, 1, box)
 
-            -- legend-style group name: positioned on the top border, breaks it visually
-            -- background matches the page (outside the island) so the border looks interrupted
-            New("TextLabel", {
-                Size=UDim2.new(0,0,0,16), Position=UDim2.new(0,9,0,-8),
+            -- island header: plain text sitting on the top border, no background box
+            local header = New("TextLabel", {
+                AnchorPoint=Vector2.new(0,0.5),
+                Size=UDim2.new(0,0,0,14), Position=UDim2.new(0,11,0,0),
                 AutomaticSize=Enum.AutomaticSize.X,
-                BackgroundColor3=Theme.Bg, Font=Theme.Bold, TextSize=12,
-                Text="  " .. (groupOpts.Name or "Group"):upper() .. "  ",
+                BackgroundTransparency=1, Font=Theme.Bold, TextSize=12,
+                Text=(groupOpts.Name or "Group"):upper(),
                 TextColor3=Color3.new(1,1,1), TextXAlignment=Enum.TextXAlignment.Left,
                 ZIndex=4, Parent=box,
             })
+
+            -- 1px border on all four sides; the top line has a gap where the header sits
+            local bc = Theme.IslandBorder
+            New("Frame", { Size=UDim2.new(0,1,1,0), Position=UDim2.new(0,0,0,0),
+                BackgroundColor3=bc, BorderSizePixel=0, ZIndex=2, Parent=box })            -- left
+            New("Frame", { Size=UDim2.new(0,1,1,0), AnchorPoint=Vector2.new(1,0),
+                Position=UDim2.new(1,0,0,0), BackgroundColor3=bc, BorderSizePixel=0, ZIndex=2, Parent=box }) -- right
+            New("Frame", { Size=UDim2.new(1,0,0,1), AnchorPoint=Vector2.new(0,1),
+                Position=UDim2.new(0,0,1,0), BackgroundColor3=bc, BorderSizePixel=0, ZIndex=2, Parent=box }) -- bottom
+            New("Frame", { Size=UDim2.new(0,7,0,1), Position=UDim2.new(0,0,0,0),
+                BackgroundColor3=bc, BorderSizePixel=0, ZIndex=2, Parent=box })            -- top stub (left of header)
+            local topRight = New("Frame", { Size=UDim2.new(1,-30,0,1), AnchorPoint=Vector2.new(1,0),
+                Position=UDim2.new(1,0,0,0), BackgroundColor3=bc, BorderSizePixel=0, ZIndex=2, Parent=box }) -- top (right of header)
+            local function updateTop()
+                topRight.Size = UDim2.new(1, -(11 + header.AbsoluteSize.X + 4), 0, 1)
+            end
+            header:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateTop)
+            task.defer(updateTop)
 
             local body = New("Frame", {
                 Size=UDim2.new(1,0,0,0), Position=UDim2.fromOffset(0,10),
@@ -902,6 +922,7 @@ function Library:CreateWindow(opts)
                 function T2:Get() return T2.Value end
 
                 if o.Default then T2:Set(true) end
+                regAccent(function() if T2.Value then sq.BackgroundColor3 = Theme.Accent end end)
 
                 function T2:AddColorPicker(co)
                     mountColorPicker(addons, co or {}, Win); return T2
@@ -927,23 +948,26 @@ function Library:CreateWindow(opts)
                     Font=Theme.Font, TextSize=Theme.Sz, Text=o.Text or "Slider",
                     TextColor3=Color3.new(1,1,1), TextXAlignment=Enum.TextXAlignment.Left, Parent=r,
                 })
-                -- minus: bare symbol, no box, a bit darker
+                -- minus: bare symbol, no box, a bit darker, vertically centred on the track
                 local minusBtn = New("TextButton", {
-                    Size=UDim2.new(0,12,0,16), Position=UDim2.new(0,0,0,18),
+                    AnchorPoint=Vector2.new(0,0.5),
+                    Size=UDim2.new(0,14,0,14), Position=UDim2.new(0,0,0,24),
                     BackgroundTransparency=1, BorderSizePixel=0,
-                    Text="-", Font=Theme.Bold, TextSize=15, TextColor3=Color3.fromRGB(120,120,130),
+                    Text="-", Font=Theme.Bold, TextSize=16, TextColor3=Color3.fromRGB(120,120,130),
                     AutoButtonColor=false, Parent=r,
                 })
-                -- track (shrunk by 30px to leave room for +/- symbols); Active sinks input so
-                -- dragging the slider never drags the whole window
-                local track = New("Frame", {
-                    Size=UDim2.new(1,-30,0,7), Position=UDim2.fromOffset(15,21),
-                    BackgroundColor3=Theme.Elem, BorderSizePixel=0, Active=true, Parent=r,
+                -- track is a TextButton so it reliably sinks the click — pulling the slider
+                -- never drags the whole window
+                local track = New("TextButton", {
+                    Size=UDim2.new(1,-32,0,8), Position=UDim2.fromOffset(16,20),
+                    BackgroundColor3=Theme.Elem, BorderSizePixel=0, Text="",
+                    AutoButtonColor=false, Parent=r,
                 })
                 local fill = New("Frame", {
                     Size=UDim2.fromScale(0,1), BackgroundColor3=Theme.Accent,
                     BorderSizePixel=0, Parent=track,
                 })
+                regAccent(function() fill.BackgroundColor3 = Theme.Accent end)
                 -- value label sitting ON the slider, moving with the fill endpoint:
                 -- starts just below the top edge and runs down past the bottom edge
                 local trackLbl = New("TextLabel", {
@@ -953,11 +977,12 @@ function Library:CreateWindow(opts)
                     ZIndex=6, Parent=track,
                 })
                 TextStroke(trackLbl, 1.5)
-                -- plus: bare symbol, no box, a bit darker
+                -- plus: bare symbol, no box, a bit darker, vertically centred on the track
                 local plusBtn = New("TextButton", {
-                    Size=UDim2.new(0,12,0,16), Position=UDim2.new(1,-12,0,18),
+                    AnchorPoint=Vector2.new(1,0.5),
+                    Size=UDim2.new(0,14,0,14), Position=UDim2.new(1,0,0,24),
                     BackgroundTransparency=1, BorderSizePixel=0,
-                    Text="+", Font=Theme.Bold, TextSize=15, TextColor3=Color3.fromRGB(120,120,130),
+                    Text="+", Font=Theme.Bold, TextSize=16, TextColor3=Color3.fromRGB(120,120,130),
                     AutoButtonColor=false, Parent=r,
                 })
 
@@ -1015,23 +1040,23 @@ function Library:CreateWindow(opts)
                     Font=Theme.Font, TextSize=11, Text=o.Text or "Dropdown",
                     TextColor3=Theme.Dim, TextXAlignment=Enum.TextXAlignment.Left, Parent=r,
                 })
+                -- closed field: no border, no rounding, a touch lower under the label
                 local boxBtn = New("TextButton", {
-                    Size=UDim2.new(1,0,0,16), Position=UDim2.fromOffset(0,14),
+                    Size=UDim2.new(1,0,0,16), Position=UDim2.fromOffset(0,15),
                     BackgroundColor3=Theme.Elem, BorderSizePixel=0, Text="",
                     AutoButtonColor=false, Parent=r,
                 })
-                Stroke(Theme.BorderDim, 1, boxBtn)
                 local sel = New("TextLabel", {
-                    BackgroundTransparency=1, Position=UDim2.fromOffset(5,0),
-                    Size=UDim2.new(1,-18,1,0), Font=Theme.Font, TextSize=Theme.Sz,
+                    BackgroundTransparency=1, Position=UDim2.fromOffset(6,0),
+                    Size=UDim2.new(1,-22,1,0), Font=Theme.Font, TextSize=Theme.Sz,
                     TextColor3=Theme.Text, TextXAlignment=Enum.TextXAlignment.Left,
                     TextTruncate=Enum.TextTruncate.AtEnd, Parent=boxBtn,
                 })
-                -- visible arrow indicator
+                -- down arrow on the right
                 New("TextLabel", {
                     BackgroundTransparency=1, AnchorPoint=Vector2.new(1,.5),
-                    Position=UDim2.new(1,-4,.5,0), Size=UDim2.fromOffset(10,10),
-                    Font=Theme.Bold, TextSize=11, Text="▾", TextColor3=Theme.Text, Parent=boxBtn,
+                    Position=UDim2.new(1,-5,.5,0), Size=UDim2.fromOffset(10,10),
+                    Font=Theme.Bold, TextSize=10, Text="▼", TextColor3=Theme.Dim, Parent=boxBtn,
                 })
 
                 local function display()
@@ -1062,34 +1087,40 @@ function Library:CreateWindow(opts)
                         Size=UDim2.fromScale(1,1), BackgroundTransparency=1, Text="",
                         AutoButtonColor=false, ZIndex=55, Parent=overlay,
                     }).MouseButton1Click:Connect(function() Win.CloseOverlays() end)
+                    -- list: slightly darker than the button, no rounding, no green outline
                     local lf = New("Frame", {
                         BackgroundColor3=Theme.Panel, BorderSizePixel=0,
                         ZIndex=60, AutomaticSize=Enum.AutomaticSize.Y, Parent=overlay,
                     })
-                    Corner(3, lf)
-                    Stroke(Theme.Accent, 1, lf)
                     List(Enum.FillDirection.Vertical, 0, Enum.HorizontalAlignment.Left,
                          Enum.VerticalAlignment.Top, lf)
                     local ap = boxBtn.AbsolutePosition
                     local mp = main.AbsolutePosition
-                    lf.Position = UDim2.fromOffset(ap.X-mp.X, ap.Y-mp.Y+boxBtn.AbsoluteSize.Y+2)
+                    lf.Position = UDim2.fromOffset(ap.X-mp.X, ap.Y-mp.Y+boxBtn.AbsoluteSize.Y+3)
                     lf.Size     = UDim2.fromOffset(boxBtn.AbsoluteSize.X, 0)
 
                     for _, opt in ipairs(D.Options) do
                         local ob = New("TextButton", {
-                            Size=UDim2.new(1,0,0,18), BackgroundColor3=Theme.Panel,
+                            Size=UDim2.new(1,0,0,20), BackgroundColor3=Theme.Panel,
                             BorderSizePixel=0, AutoButtonColor=false,
                             Font=Theme.Font, TextSize=Theme.Sz, Text="  "..opt,
-                            TextXAlignment=Enum.TextXAlignment.Left, ZIndex=61, Parent=lf,
+                            TextColor3=Theme.Dim, TextXAlignment=Enum.TextXAlignment.Left,
+                            ZIndex=61, Parent=lf,
                         })
                         local function refOpt()
                             local on = multi and D.Value[opt] or (D.Value==opt)
-                            ob.TextColor3 = on and Theme.Accent or Theme.Dim
-                            ob.BackgroundColor3 = on and Theme.Elem or Theme.Panel
+                            ob.Font            = Theme.Font
+                            ob.TextColor3      = on and Theme.Accent or Theme.Dim
+                            ob.BackgroundColor3= Theme.Panel
                         end
                         refOpt()
-                        ob.MouseEnter:Connect(function() ob.BackgroundColor3=Theme.ElemHov end)
-                        ob.MouseLeave:Connect(function() refOpt() end)
+                        -- hover: bolder, whiter, darker background (darker than the island)
+                        ob.MouseEnter:Connect(function()
+                            ob.Font = Theme.Bold
+                            ob.TextColor3 = Color3.new(1,1,1)
+                            ob.BackgroundColor3 = Theme.Bg
+                        end)
+                        ob.MouseLeave:Connect(refOpt)
                         ob.MouseButton1Click:Connect(function()
                             if multi then D.Value[opt]=not D.Value[opt]; refOpt(); display(); fire()
                             else D.Value=opt; display(); fire(); Win.CloseOverlays() end
@@ -1107,6 +1138,7 @@ function Library:CreateWindow(opts)
                 end
                 function D:Get() return D.Value end
                 function D:SetOptions(opts2) D.Options=opts2 or {}; display() end
+                function D:SetVisible(vis) r.Visible = vis end  -- collapses in the list layout when hidden
                 display()
                 return D
             end
@@ -1257,8 +1289,7 @@ function Library:CreateWindow(opts)
                     ClipsDescendants = true,
                     Parent = body,
                 })
-                Corner(3, container)
-                Stroke(Theme.BorderDim, 1, container)
+                Stroke(Theme.IslandBorder, 1, container)  -- sharp box (config tab allows boxes)
 
                 local scroll = New("ScrollingFrame", {
                     Size = UDim2.fromScale(1, 1),
@@ -1270,6 +1301,7 @@ function Library:CreateWindow(opts)
                     AutomaticCanvasSize = Enum.AutomaticSize.Y,
                     Parent = container,
                 })
+                regAccent(function() scroll.ScrollBarImageColor3 = Theme.Accent end)
                 List(Enum.FillDirection.Vertical, 1, Enum.HorizontalAlignment.Left,
                      Enum.VerticalAlignment.Top, scroll)
 
