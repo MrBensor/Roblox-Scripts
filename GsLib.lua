@@ -209,6 +209,7 @@ local function mountColorPicker(holder, o, Win)
     local function rebuild()
         col = Color3.fromHSV(h, s, v)
         swatch.BackgroundColor3 = col
+        swatch.BackgroundTransparency = 1 - alpha  -- swatch shows current opacity
         if o.Callback then pcall(o.Callback, col, alpha) end
     end
 
