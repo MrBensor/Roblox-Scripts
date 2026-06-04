@@ -20,6 +20,7 @@ local ThemeDefaults = {
     ElemHov     = Color3.fromRGB(44, 44, 46),
     Border      = Color3.fromRGB(50, 50, 55),
     BorderDim   = Color3.fromRGB(28, 28, 32),
+    IslandBorder= Color3.fromRGB(58, 58, 66),
     Text        = Color3.fromRGB(200, 200, 200),
     Dim         = Color3.fromRGB(110, 110, 115),
     Muted       = Color3.fromRGB(70, 70, 75),
@@ -58,6 +59,16 @@ local function Stroke(color, thick, parent)
         Color = color, Thickness = thick or 1,
         ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
         Parent = parent,
+    })
+end
+
+-- black outline on text labels for contrast (numbers, values, etc.)
+local function TextStroke(label, thick)
+    return New("UIStroke", {
+        Color = Color3.new(0, 0, 0), Thickness = thick or 1,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
+        LineJoinMode = Enum.LineJoinMode.Round,
+        Parent = label,
     })
 end
 
@@ -189,12 +200,11 @@ local function mountColorPicker(holder, o, Win)
     local h, s, v = Color3.toHSV(col)
 
     local swatch = New("TextButton", {
-        Size = UDim2.fromOffset(22, 12),
+        Size = UDim2.fromOffset(26, 13),
         BackgroundColor3 = col,
         BorderSizePixel = 0, Text = "", AutoButtonColor = false,
         Parent = holder,
     })
-    Corner(2, swatch)
     Stroke(Color3.fromRGB(0,0,0), 1, swatch)
 
     local function rebuild()
@@ -203,25 +213,41 @@ local function mountColorPicker(holder, o, Win)
         if o.Callback then pcall(o.Callback, col, alpha) end
     end
 
+    -- layout constants
+    local PAD, SVW, SVH, GAP, HUEW = 8, 150, 128, 8, 14
+    local popW = PAD + SVW + GAP + HUEW + PAD
+
     local function openPopup()
         Win.CloseOverlays()
-        local h2 = (alpha ~= nil) and 152 or 136
+        local popH = PAD + SVH + (alpha ~= nil and 18 or 0) + PAD
+
+        -- click-outside catcher closes the popup
+        New("TextButton", {
+            Size = UDim2.fromScale(1,1), BackgroundTransparency = 1, Text = "",
+            AutoButtonColor = false, ZIndex = 55, Parent = Win.Overlay,
+        }).MouseButton1Click:Connect(function() Win.CloseOverlays() end)
+
         local pop = New("Frame", {
-            Size = UDim2.fromOffset(180, h2),
+            Size = UDim2.fromOffset(popW, popH),
             BackgroundColor3 = Theme.Panel,
             BorderSizePixel = 0, ZIndex = 70, Parent = Win.Overlay,
         })
         Corner(3, pop)
         Stroke(Theme.Accent, 1, pop)
 
-        local ap  = swatch.AbsolutePosition
-        local mp  = Win.Main.AbsolutePosition
-        local px  = ap.X - mp.X - 154
-        if px < 0 then px = ap.X - mp.X end
-        pop.Position = UDim2.fromOffset(px, ap.Y - mp.Y + 14)
+        -- position: open left of the swatch, clamped fully inside the window
+        local ap = swatch.AbsolutePosition
+        local mp = Win.Main.AbsolutePosition
+        local ms = Win.Main.AbsoluteSize
+        local px = ap.X - mp.X + swatch.AbsoluteSize.X - popW
+        px = math.clamp(px, 4, math.max(4, ms.X - popW - 4))
+        local py = ap.Y - mp.Y + swatch.AbsoluteSize.Y + 4
+        py = math.clamp(py, 4, math.max(4, ms.Y - popH - 4))
+        pop.Position = UDim2.fromOffset(px, py)
 
+        -- ── SV (shade) field ──────────────────────
         local sv = New("ImageButton", {
-            Size = UDim2.fromOffset(140, 120), Position = UDim2.fromOffset(8, 8),
+            Size = UDim2.fromOffset(SVW, SVH), Position = UDim2.fromOffset(PAD, PAD),
             BackgroundColor3 = Color3.fromHSV(h, 1, 1),
             BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 71, Parent = pop,
         })
@@ -251,8 +277,9 @@ local function mountColorPicker(holder, o, Win)
         local function updateCur() cur.Position = UDim2.new(s, 0, 1 - v, 0) end
         updateCur()
 
+        -- ── hue bar (red → … → red) ───────────────
         local hueBar = New("ImageButton", {
-            Size = UDim2.fromOffset(14, 120), Position = UDim2.fromOffset(156, 8),
+            Size = UDim2.fromOffset(HUEW, SVH), Position = UDim2.fromOffset(PAD + SVW + GAP, PAD),
             BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 71, Parent = pop,
         })
         New("UIGradient", {
@@ -268,23 +295,71 @@ local function mountColorPicker(holder, o, Win)
             }), Parent = hueBar,
         })
         local hueCur = New("Frame", {
-            Size = UDim2.fromOffset(16,3), AnchorPoint = Vector2.new(.5,.5),
+            Size = UDim2.fromOffset(HUEW+4,3), AnchorPoint = Vector2.new(.5,.5),
             Position = UDim2.new(.5,0,h,0),
             BackgroundColor3 = Color3.new(1,1,1), BorderSizePixel = 0, ZIndex = 72, Parent = hueBar,
         })
         Stroke(Color3.new(0,0,0), 1, hueCur)
 
+        -- ── alpha (transparency) bar — only if Alpha was supplied ──
+        local alphaFrame, alphaCur
+        local function refreshAlphaColor()
+            if alphaFrame then alphaFrame.BackgroundColor3 = Color3.fromHSV(h, s, v) end
+        end
+        if alpha ~= nil then
+            local ab = New("ImageButton", {
+                Size = UDim2.fromOffset(SVW + GAP + HUEW, 10),
+                Position = UDim2.fromOffset(PAD, PAD + SVH + 8),
+                BackgroundColor3 = Color3.fromRGB(20,20,20),
+                BorderSizePixel = 0, Text = "", AutoButtonColor = false, ZIndex = 71, Parent = pop,
+            })
+            alphaFrame = New("Frame", {
+                Size = UDim2.fromScale(1,1), BackgroundColor3 = Color3.fromHSV(h,s,v),
+                BorderSizePixel = 0, ZIndex = 72, Parent = ab,
+            })
+            New("UIGradient", {     -- left transparent → right opaque
+                Transparency = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0,1), NumberSequenceKeypoint.new(1,0),
+                }), Parent = alphaFrame,
+            })
+            alphaCur = New("Frame", {
+                Size = UDim2.fromOffset(3, 14), AnchorPoint = Vector2.new(.5,.5),
+                Position = UDim2.new(alpha,0,.5,0),
+                BackgroundColor3 = Color3.new(1,1,1), BorderSizePixel = 0, ZIndex = 73, Parent = ab,
+            })
+            Stroke(Color3.new(0,0,0), 1, alphaCur)
+
+            local aD = false
+            local function aUp(p)
+                alpha = math.clamp((p.X - ab.AbsolutePosition.X) / ab.AbsoluteSize.X, 0, 1)
+                alphaCur.Position = UDim2.new(alpha,0,.5,0); rebuild()
+            end
+            ab.InputBegan:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseButton1 then aD=true; aUp(i.Position) end
+            end)
+            local c1 = UIS.InputChanged:Connect(function(i)
+                if aD and i.UserInputType == Enum.UserInputType.MouseMovement then aUp(i.Position) end
+            end)
+            local c2 = UIS.InputEnded:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseButton1 then aD=false end
+            end)
+            pop.Destroying:Connect(function()
+                pcall(function() c1:Disconnect() end)
+                pcall(function() c2:Disconnect() end)
+            end)
+        end
+
         local svD, hD = false, false
         local function svUp(p)
             s = math.clamp((p.X - sv.AbsolutePosition.X) / sv.AbsoluteSize.X, 0, 1)
             v = 1 - math.clamp((p.Y - sv.AbsolutePosition.Y) / sv.AbsoluteSize.Y, 0, 1)
-            updateCur(); rebuild()
+            updateCur(); refreshAlphaColor(); rebuild()
         end
         local function hUp(p)
             h = math.clamp((p.Y - hueBar.AbsolutePosition.Y) / hueBar.AbsoluteSize.Y, 0, 1)
             hueCur.Position = UDim2.new(.5, 0, h, 0)
             sv.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
-            rebuild()
+            refreshAlphaColor(); rebuild()
         end
         sv.InputBegan:Connect(function(i)
             if i.UserInputType == Enum.UserInputType.MouseButton1 then svD=true; svUp(i.Position) end
@@ -304,39 +379,6 @@ local function mountColorPicker(holder, o, Win)
             pcall(function() mc:Disconnect() end)
             pcall(function() ec:Disconnect() end)
         end)
-
-        if alpha ~= nil then
-            local ab = New("Frame", {
-                Size = UDim2.fromOffset(162, 8), Position = UDim2.fromOffset(8, 134),
-                BackgroundColor3 = col, BorderSizePixel = 0, ZIndex = 71, Parent = pop,
-            })
-            Corner(2, ab)
-            local af = New("Frame", {
-                Size = UDim2.new(alpha,0,1,0), BackgroundColor3 = Color3.new(0,0,0),
-                BackgroundTransparency = 0.4, BorderSizePixel = 0, ZIndex = 72, Parent = ab,
-            })
-            local ab2 = New("TextButton", {
-                Size = UDim2.fromScale(1,1), BackgroundTransparency=1, Text="", ZIndex=73, Parent=ab,
-            })
-            local aD = false
-            local function aUp(p)
-                alpha = math.clamp((p.X - ab.AbsolutePosition.X) / ab.AbsoluteSize.X, 0, 1)
-                af.Size = UDim2.new(alpha,0,1,0); rebuild()
-            end
-            ab2.InputBegan:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then aD=true; aUp(i.Position) end
-            end)
-            local c1 = UIS.InputChanged:Connect(function(i)
-                if aD and i.UserInputType == Enum.UserInputType.MouseMovement then aUp(i.Position) end
-            end)
-            local c2 = UIS.InputEnded:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then aD=false end
-            end)
-            pop.Destroying:Connect(function()
-                pcall(function() c1:Disconnect() end)
-                pcall(function() c2:Disconnect() end)
-            end)
-        end
     end
 
     swatch.MouseButton1Click:Connect(function()
@@ -467,7 +509,7 @@ function Library:CreateWindow(opts)
         Size = UDim2.fromOffset(sz.X, sz.Y),
         Position = UDim2.new(.5, -sz.X/2, .5, -sz.Y/2),
         BackgroundColor3 = Theme.Bg, BorderSizePixel = 0,
-        ClipsDescendants = true, Parent = gui,
+        ClipsDescendants = true, Active = true, Parent = gui,
     })
     Stroke(Theme.Border, 2, main)
     Win.Main = main
@@ -537,12 +579,19 @@ function Library:CreateWindow(opts)
 
     do
         local drag, ds, sp = false, nil, nil
+        -- drag from anywhere on the window. Buttons, dropdowns, text boxes and the
+        -- slider track are interactive (they sink the click) so they never start a drag,
+        -- and we ignore drags while a popup (dropdown / colorpicker) is open.
+        -- Exposed so the scrolling columns can hook it too (a ScrollingFrame may sink
+        -- the click before it bubbles up to Main).
         local function startDrag(i)
-            drag=true; ds=i.Position; sp=main.Position
+            if i.UserInputType == Enum.UserInputType.MouseButton1
+               and not drag and #overlay:GetChildren() == 0 then
+                drag=true; ds=i.Position; sp=main.Position
+            end
         end
-        sideTitle.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1 then startDrag(i) end
-        end)
+        Win._startDrag = startDrag
+        main.InputBegan:Connect(startDrag)
         local mc = UIS.InputChanged:Connect(function(i)
             if drag and i.UserInputType == Enum.UserInputType.MouseMovement then
                 local d = i.Position - ds
@@ -699,15 +748,54 @@ function Library:CreateWindow(opts)
 
         local function makeCol(xScale, xOff)
             local col = New("ScrollingFrame", {
-                Size = UDim2.new(.5, -14, 1, -10),
-                Position = UDim2.new(xScale, xOff, 0, 8),
+                Size = UDim2.new(.5, -14, 1, -18),
+                Position = UDim2.new(xScale, xOff, 0, 10),
                 BackgroundTransparency=1, BorderSizePixel=0,
                 ScrollBarThickness=3, ScrollBarImageColor3=Theme.Accent,
+                ScrollingDirection=Enum.ScrollingDirection.Y,
                 CanvasSize=UDim2.new(0,0,0,0), AutomaticCanvasSize=Enum.AutomaticSize.Y,
                 Parent=page,
             })
-            List(Enum.FillDirection.Vertical, 7, Enum.HorizontalAlignment.Left,
+            -- top room so the legend headers (sit at y=-7 on the box border) aren't clipped
+            Pad(10, 10, 0, 4, col)
+            List(Enum.FillDirection.Vertical, 9, Enum.HorizontalAlignment.Left,
                  Enum.VerticalAlignment.Top, col)
+
+            -- scroll arrows (left of the scrollbar): ▲ at top, ▼ at bottom
+            local arrowLayer = New("Frame", {
+                Size = col.Size, Position = col.Position,
+                BackgroundTransparency=1, ZIndex=8, Parent=page,
+            })
+            local function arrow(sym, anchorY, posY)
+                local a = New("TextLabel", {
+                    AnchorPoint=Vector2.new(1,anchorY), Position=UDim2.new(1,-1,posY,0),
+                    Size=UDim2.fromOffset(9,9), BackgroundTransparency=1,
+                    Font=Theme.Bold, TextSize=10, Text=sym,
+                    TextColor3=Color3.new(1,1,1), Visible=false, ZIndex=9, Parent=arrowLayer,
+                })
+                TextStroke(a, 1)
+                return a
+            end
+            local upArrow   = arrow("▲", 0, 0)
+            local downArrow = arrow("▼", 1, 1)
+            local function refreshArrows()
+                local maxScroll = col.AbsoluteCanvasSize.Y - col.AbsoluteWindowSize.Y
+                upArrow.Visible   = maxScroll > 1 and col.CanvasPosition.Y > 1
+                downArrow.Visible = maxScroll > 1 and col.CanvasPosition.Y < (maxScroll - 1)
+            end
+            col:GetPropertyChangedSignal("CanvasPosition"):Connect(refreshArrows)
+            col:GetPropertyChangedSignal("AbsoluteCanvasSize"):Connect(refreshArrows)
+            col:GetPropertyChangedSignal("AbsoluteWindowSize"):Connect(refreshArrows)
+            task.defer(refreshArrows)
+
+            -- let dragging start from empty space inside the column too (skip the
+            -- scrollbar strip on the right edge)
+            col.InputBegan:Connect(function(i)
+                if i.UserInputType == Enum.UserInputType.MouseButton1
+                   and (i.Position.X - col.AbsolutePosition.X) < (col.AbsoluteSize.X - 8) then
+                    Win._startDrag(i)
+                end
+            end)
             return col
         end
         Tab.Left  = makeCol(0,  12)
@@ -727,15 +815,15 @@ function Library:CreateWindow(opts)
                 BackgroundColor3=Theme.Panel, BorderSizePixel=0, Parent=parentCol,
             })
             Corner(3, box)
-            Stroke(Theme.BorderDim, 1, box)
+            Stroke(Theme.IslandBorder, 1, box)
 
             -- legend-style group name: positioned on the top border, breaks it visually
-            -- background matches sidebar so the border line appears interrupted
+            -- background matches the page (outside the island) so the border looks interrupted
             New("TextLabel", {
-                Size=UDim2.new(0,0,0,14), Position=UDim2.new(0,8,0,-7),
+                Size=UDim2.new(0,0,0,16), Position=UDim2.new(0,9,0,-8),
                 AutomaticSize=Enum.AutomaticSize.X,
-                BackgroundColor3=Theme.Sidebar, Font=Theme.Bold, TextSize=11,
-                Text=" " .. (groupOpts.Name or "Group"):upper() .. " ",
+                BackgroundColor3=Theme.Bg, Font=Theme.Bold, TextSize=12,
+                Text="  " .. (groupOpts.Name or "Group"):upper() .. "  ",
                 TextColor3=Color3.new(1,1,1), TextXAlignment=Enum.TextXAlignment.Left,
                 ZIndex=4, Parent=box,
             })
@@ -832,47 +920,44 @@ function Library:CreateWindow(opts)
                 local dec     = o.Decimals or 0
                 local S = { Value = math.clamp(o.Default or mn, mn, mx) }
 
-                local r = row(32)
-                local top = New("Frame", {Size=UDim2.new(1,0,0,13), BackgroundTransparency=1, Parent=r})
+                local r = row(34)
+                -- name only (the value lives ON the slider, nowhere else)
                 New("TextLabel", {
-                    BackgroundTransparency=1, Size=UDim2.new(1,-50,1,0),
+                    BackgroundTransparency=1, Size=UDim2.new(1,0,0,13),
                     Font=Theme.Font, TextSize=Theme.Sz, Text=o.Text or "Slider",
-                    TextColor3=Theme.Dim, TextXAlignment=Enum.TextXAlignment.Left, Parent=top,
+                    TextColor3=Color3.new(1,1,1), TextXAlignment=Enum.TextXAlignment.Left, Parent=r,
                 })
-                local valLbl = New("TextLabel", {
-                    BackgroundTransparency=1, AnchorPoint=Vector2.new(1,0),
-                    Position=UDim2.new(1,0,0,0), Size=UDim2.new(0,48,1,0),
-                    Font=Theme.Font, TextSize=Theme.Sz, TextColor3=Theme.Text,
-                    TextXAlignment=Enum.TextXAlignment.Right, Parent=top,
-                })
-                -- minus button (left of track)
+                -- minus: bare symbol, no box, a bit darker
                 local minusBtn = New("TextButton", {
-                    Size=UDim2.new(0,13,0,12), Position=UDim2.new(0,0,0,15),
-                    BackgroundColor3=Theme.Elem, BorderSizePixel=0,
-                    Text="-", Font=Theme.Bold, TextSize=13, TextColor3=Theme.Text,
+                    Size=UDim2.new(0,12,0,16), Position=UDim2.new(0,0,0,18),
+                    BackgroundTransparency=1, BorderSizePixel=0,
+                    Text="-", Font=Theme.Bold, TextSize=15, TextColor3=Color3.fromRGB(120,120,130),
                     AutoButtonColor=false, Parent=r,
                 })
-                -- track (shrunk by 32px to leave room for +/- buttons)
+                -- track (shrunk by 30px to leave room for +/- symbols); Active sinks input so
+                -- dragging the slider never drags the whole window
                 local track = New("Frame", {
-                    Size=UDim2.new(1,-32,0,6), Position=UDim2.fromOffset(16,18),
-                    BackgroundColor3=Theme.Elem, BorderSizePixel=0, Parent=r,
+                    Size=UDim2.new(1,-30,0,7), Position=UDim2.fromOffset(15,21),
+                    BackgroundColor3=Theme.Elem, BorderSizePixel=0, Active=true, Parent=r,
                 })
                 local fill = New("Frame", {
                     Size=UDim2.fromScale(0,1), BackgroundColor3=Theme.Accent,
                     BorderSizePixel=0, Parent=track,
                 })
-                -- floating value label that moves with fill endpoint
+                -- value label sitting ON the slider, moving with the fill endpoint:
+                -- starts just below the top edge and runs down past the bottom edge
                 local trackLbl = New("TextLabel", {
-                    BackgroundTransparency=1, AnchorPoint=Vector2.new(0.5,0.5),
-                    Position=UDim2.new(0,0,0.5,0), Size=UDim2.fromOffset(38,10),
-                    Font=Theme.Bold, TextSize=8, TextColor3=Color3.new(1,1,1),
-                    ZIndex=5, Parent=track,
+                    BackgroundTransparency=1, AnchorPoint=Vector2.new(0.5,0),
+                    Position=UDim2.new(0,0,0,1), Size=UDim2.fromOffset(48,14),
+                    Font=Theme.Bold, TextSize=12, TextColor3=Color3.new(1,1,1),
+                    ZIndex=6, Parent=track,
                 })
-                -- plus button (right of track)
+                TextStroke(trackLbl, 1.5)
+                -- plus: bare symbol, no box, a bit darker
                 local plusBtn = New("TextButton", {
-                    Size=UDim2.new(0,13,0,12), Position=UDim2.new(1,-13,0,15),
-                    BackgroundColor3=Theme.Elem, BorderSizePixel=0,
-                    Text="+", Font=Theme.Bold, TextSize=13, TextColor3=Theme.Text,
+                    Size=UDim2.new(0,12,0,16), Position=UDim2.new(1,-12,0,18),
+                    BackgroundTransparency=1, BorderSizePixel=0,
+                    Text="+", Font=Theme.Bold, TextSize=15, TextColor3=Color3.fromRGB(120,120,130),
                     AutoButtonColor=false, Parent=r,
                 })
 
@@ -886,9 +971,8 @@ function Library:CreateWindow(opts)
                     S.Value = vv
                     local rel = (vv-mn)/(mx-mn)
                     fill.Size = UDim2.fromScale(rel, 1)
-                    valLbl.Text  = fmt(vv)
                     trackLbl.Text = fmt(vv)
-                    trackLbl.Position = UDim2.new(math.clamp(rel,0.05,0.95),0,0.5,0)
+                    trackLbl.Position = UDim2.new(math.clamp(rel,0.12,0.88),0,0,1)
                     if o.Callback then pcall(o.Callback, vv) end
                 end
                 function S:Get() return S.Value end
@@ -973,6 +1057,11 @@ function Library:CreateWindow(opts)
                 end
                 local function buildList()
                     Win.CloseOverlays()
+                    -- click-outside catcher closes the dropdown
+                    New("TextButton", {
+                        Size=UDim2.fromScale(1,1), BackgroundTransparency=1, Text="",
+                        AutoButtonColor=false, ZIndex=55, Parent=overlay,
+                    }).MouseButton1Click:Connect(function() Win.CloseOverlays() end)
                     local lf = New("Frame", {
                         BackgroundColor3=Theme.Panel, BorderSizePixel=0,
                         ZIndex=60, AutomaticSize=Enum.AutomaticSize.Y, Parent=overlay,
