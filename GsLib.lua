@@ -195,7 +195,7 @@ end
 local function mountColorPicker(holder, o, Win)
     o = o or {}
     local col    = o.Default or Color3.new(1, 1, 1)
-    local alpha  = (o.Alpha ~= nil) and (o.Alpha) or nil
+    local alpha  = (o.Alpha ~= nil) and o.Alpha or 1  -- default fully opaque; always show alpha bar
     local h, s, v = Color3.toHSV(col)
 
     local swatch = New("TextButton", {
