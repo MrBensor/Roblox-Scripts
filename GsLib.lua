@@ -244,31 +244,37 @@ local function mountColorPicker(holder, o, Win)
         pop.Position = UDim2.fromOffset(px, py)
 
         -- ── SV (shade) field ──────────────────────
+        -- Three layers: base (hue) → white overlay fading right (saturation) → black overlay fading down (value)
         local sv = New("ImageButton", {
             Size = UDim2.fromOffset(SVW, SVH), Position = UDim2.fromOffset(PAD, PAD),
-            BackgroundColor3 = Color3.fromHSV(h, 1, 1),
+            BackgroundColor3 = Color3.fromHSV(h, 1, 1),  -- base hue colour
             BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 71, Parent = pop,
         })
+        -- saturation axis: white (left, S=0) → transparent (right, reveals hue base)
         New("UIGradient", {
-            Color = ColorSequence.new(Color3.new(1,1,1)),
             Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0,0), NumberSequenceKeypoint.new(1,1),
-            }), Parent = sv,
+                NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1),
+            }),
+            Parent = New("Frame", {
+                Size = UDim2.fromScale(1,1), BackgroundColor3 = Color3.new(1,1,1),
+                BorderSizePixel = 0, ZIndex = 72, Parent = sv,
+            }),
         })
+        -- value axis: transparent (top, V=1) → black (bottom, V=0)
         New("UIGradient", {
             Rotation = 90,
             Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0,1), NumberSequenceKeypoint.new(1,0),
+                NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(1, 0),
             }),
             Parent = New("Frame", {
                 Size = UDim2.fromScale(1,1), BackgroundColor3 = Color3.new(0,0,0),
-                BorderSizePixel = 0, ZIndex = 72, Parent = sv,
+                BorderSizePixel = 0, ZIndex = 73, Parent = sv,
             }),
         })
         local cur = New("Frame", {
             Size = UDim2.fromOffset(6,6), AnchorPoint = Vector2.new(.5,.5),
             BackgroundColor3 = Color3.new(1,1,1),
-            BorderSizePixel = 0, ZIndex = 73, Parent = sv,
+            BorderSizePixel = 0, ZIndex = 74, Parent = sv,  -- above both overlays
         })
         Corner(3, cur)
         Stroke(Color3.new(0,0,0), 1, cur)
