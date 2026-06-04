@@ -659,7 +659,6 @@ function Library:CreateWindow(opts)
             t.BotLine.BackgroundTransparency = active and 0 or 1
         end
         Win.ActiveTab = tab
-        Win.CloseOverlays()
     end
 
     function Win:CreateTab(tabOpts)
@@ -747,7 +746,7 @@ function Library:CreateWindow(opts)
                 tw(Tab.Btn, .12, { TextColor3 = Theme.Dim })
             end
         end)
-        btn.MouseButton1Click:Connect(function() selectTab(Tab) end)
+        btn.MouseButton1Click:Connect(function() Win.CloseOverlays(); selectTab(Tab) end)
 
         local page = New("Frame", {
             Size = UDim2.fromScale(1,1), BackgroundTransparency=1,
