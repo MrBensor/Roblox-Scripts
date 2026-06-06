@@ -932,6 +932,7 @@ function Library:CreateWindow(opts)
                 if o.Default then T2:Set(true) end
                 regAccent(function() if T2.Value then sq.BackgroundColor3 = Theme.Accent end end)
 
+                function T2:SetVisible(vis) r.Visible = vis end
                 function T2:AddColorPicker(co)
                     mountColorPicker(addons, co or {}, Win); return T2
                 end
