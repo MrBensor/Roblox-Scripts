@@ -395,6 +395,7 @@ local function mountColorPicker(holder, o, Win)
     local P = {}
     function P:Set(c) h,s,v = Color3.toHSV(c); rebuild() end
     function P:Get() return col, alpha end
+    function P:Open() openPopup() end
     return P
 end
 
@@ -874,7 +875,7 @@ function Library:CreateWindow(opts)
                 local h = New("Frame", {
                     AnchorPoint=Vector2.new(1,.5), Position=UDim2.new(1,0,.5,0),
                     Size=UDim2.new(0,0,1,0), AutomaticSize=Enum.AutomaticSize.X,
-                    BackgroundTransparency=1, Parent=parent,
+                    BackgroundTransparency=1, ZIndex=3, Parent=parent,
                 })
                 List(Enum.FillDirection.Horizontal, 5,
                      Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Center, h)
@@ -933,8 +934,15 @@ function Library:CreateWindow(opts)
                 regAccent(function() if T2.Value then sq.BackgroundColor3 = Theme.Accent end end)
 
                 function T2:SetVisible(vis) r.Visible = vis end
+                T2.Row = r
+                T2.AddonHolder = addons
                 function T2:AddColorPicker(co)
-                    mountColorPicker(addons, co or {}, Win); return T2
+                    local P = mountColorPicker(addons, co or {}, Win)
+                    T2.ColorPicker = P
+                    for _, c in ipairs(addons:GetChildren()) do
+                        if c:IsA("TextButton") then T2.Swatch = c end
+                    end
+                    return T2
                 end
                 function T2:AddKeybind(ko)
                     mountKeybind(addons, ko or {}, Win); return T2
