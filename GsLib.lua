@@ -410,16 +410,26 @@ local function mountKeybind(holder, o, Win)
     local listening = false
 
     local function kName(k)
-        if not k then return "none" end
+        if not k then return "-" end
         if typeof(k) == "EnumItem" then
-            return k.Name:gsub("MouseButton","mouse"):lower()
+            if k.EnumType == Enum.UserInputType then
+                local n = k.Name
+                if n == "MouseButton1" then return "M1"
+                elseif n == "MouseButton2" then return "M2"
+                elseif n == "MouseButton3" then return "M3"
+                elseif n == "MouseButton4" then return "M4"
+                elseif n == "MouseButton5" then return "M5"
+                end
+                return n:lower()
+            end
+            return k.Name:lower()
         end
         return tostring(k):lower()
     end
 
     local lbl = New("TextLabel", {
         AutomaticSize = Enum.AutomaticSize.X,
-        Size = UDim2.new(0, 0, 0, 14),
+        Size = UDim2.new(0, 0, 1, 0),
         BackgroundTransparency = 1,
         Font = Theme.Font, TextSize = 11,
         Text = "[" .. kName(key) .. "]",
@@ -427,7 +437,10 @@ local function mountKeybind(holder, o, Win)
         Parent = holder,
     })
 
-    local function refresh() lbl.Text = "[" .. (listening and "..." or kName(key)) .. "]" end
+    local function refresh()
+        lbl.Text = "[" .. (listening and "..." or kName(key)) .. "]"
+        lbl.TextColor3 = listening and Color3.fromRGB(220, 60, 60) or Theme.Dim
+    end
 
     New("TextButton", {
         Size = UDim2.fromScale(1,1), BackgroundTransparency=1, Text="",
@@ -443,8 +456,11 @@ local function mountKeybind(holder, o, Win)
         if listening then
             if i.UserInputType == Enum.UserInputType.Keyboard then
                 key = (i.KeyCode == Enum.KeyCode.Escape) and nil or i.KeyCode
-            elseif i.UserInputType == Enum.UserInputType.MouseButton1
-                or i.UserInputType == Enum.UserInputType.MouseButton2 then
+            elseif i.UserInputType == Enum.UserInputType.MouseMovement
+                or i.UserInputType == Enum.UserInputType.MouseWheel
+                or i.UserInputType == Enum.UserInputType.Touch then
+                return  -- ignore movement/scroll, stay listening
+            else
                 key = i.UserInputType
             end
             listening=false; refresh(); return
@@ -916,11 +932,13 @@ function Library:CreateWindow(opts)
 
                 local addons = addonHolder(r)
 
-                New("TextButton", {
+                local clickBtn = New("TextButton", {
                     Size=UDim2.fromScale(1,1), BackgroundTransparency=1, Text="", Parent=r,
-                }).MouseButton1Click:Connect(function()
+                })
+                clickBtn.MouseButton1Click:Connect(function()
                     T2:Set(not T2.Value)
                 end)
+                T2.ClickButton = clickBtn
 
                 function T2:Set(vv)
                     T2.Value = vv
