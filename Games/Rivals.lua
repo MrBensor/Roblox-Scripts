@@ -913,12 +913,12 @@ RunService:BindToRenderStep(AIMBOT_STEP, Enum.RenderPriority.Last.Value - 1, fun
     end
 
     if bestPos then
-        local cam       = workspace.CurrentCamera
-        local currentCF = cam.CFrame
-        local targetCF  = CFrame.lookAt(currentCF.Position, bestPos)
+        local sp     = Camera:WorldToViewportPoint(bestPos)
+        local dx     = sp.X - cx
+        local dy     = sp.Y - cy
         local s      = 1 - (Settings.AimbotSmoothing / 100) * 0.9
         local frameS = math.clamp(1 - (1-s)^(dt*60), 0.01, 1)
-        cam.CFrame = currentCF:Lerp(targetCF, frameS)
+        mousemoverel(dx * frameS, dy * frameS)
     end
 end)
 
