@@ -936,9 +936,16 @@ local SINK_INPUTS = {
     Enum.UserInputType.MouseButton1, Enum.UserInputType.MouseButton2,
 }
 
+local _savedMouseBehavior    = nil
+local _savedMouseIconEnabled = nil
+
 local function applyMenuState(open)
     menuOpen = open
     if open then
+        pcall(function()
+            _savedMouseBehavior    = UserInputService.MouseBehavior
+            _savedMouseIconEnabled = UserInputService.MouseIconEnabled
+        end)
         RunService:BindToRenderStep(MENU_CURSOR, 2001, function()
             pcall(function()
                 UserInputService.MouseBehavior    = Enum.MouseBehavior.Default
@@ -954,9 +961,11 @@ local function applyMenuState(open)
         RunService:UnbindFromRenderStep(MENU_CURSOR)
         pcall(function() ContextActionService:UnbindAction(MENU_SINK) end)
         pcall(function()
-            UserInputService.MouseBehavior    = Enum.MouseBehavior.LockCenter
-            UserInputService.MouseIconEnabled = false
+            if _savedMouseBehavior    ~= nil then UserInputService.MouseBehavior    = _savedMouseBehavior    end
+            if _savedMouseIconEnabled ~= nil then UserInputService.MouseIconEnabled = _savedMouseIconEnabled end
         end)
+        _savedMouseBehavior    = nil
+        _savedMouseIconEnabled = nil
     end
 end
 
