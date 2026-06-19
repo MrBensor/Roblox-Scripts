@@ -1122,17 +1122,30 @@ function Library:CreateWindow(opts)
                         Size=UDim2.fromScale(1,1), BackgroundTransparency=1, Text="",
                         AutoButtonColor=false, ZIndex=55, Parent=overlay,
                     }).MouseButton1Click:Connect(function() Win.CloseOverlays() end)
-                    -- list: slightly darker than the button, no rounding, no green outline
-                    local lf = New("Frame", {
-                        BackgroundColor3=Theme.Panel, BorderSizePixel=0,
-                        ZIndex=60, AutomaticSize=Enum.AutomaticSize.Y, Parent=overlay,
-                    })
-                    List(Enum.FillDirection.Vertical, 0, Enum.HorizontalAlignment.Left,
-                         Enum.VerticalAlignment.Top, lf)
+                    -- list: fixed max-height + inner ScrollingFrame so long lists can scroll
                     local ap = boxBtn.AbsolutePosition
                     local mp = main.AbsolutePosition
+                    local ITEM_H = 20
+                    local MAX_H  = 200
+                    local totalH = #D.Options * ITEM_H
+                    local visH   = math.max(ITEM_H, math.min(totalH, MAX_H))
+                    local lf = New("Frame", {
+                        BackgroundColor3=Theme.Panel, BorderSizePixel=0,
+                        ZIndex=60, ClipsDescendants=true,
+                        Size=UDim2.fromOffset(boxBtn.AbsoluteSize.X, visH), Parent=overlay,
+                    })
                     lf.Position = UDim2.fromOffset(ap.X-mp.X, ap.Y-mp.Y+boxBtn.AbsoluteSize.Y+3)
-                    lf.Size     = UDim2.fromOffset(boxBtn.AbsoluteSize.X, 0)
+                    local sbW = totalH > MAX_H and 4 or 0
+                    local inner = New("ScrollingFrame", {
+                        BackgroundTransparency=1, BorderSizePixel=0,
+                        Size=UDim2.fromScale(1,1),
+                        CanvasSize=UDim2.fromOffset(0, totalH),
+                        ScrollBarThickness=sbW,
+                        ScrollBarImageColor3=Theme.Muted,
+                        ZIndex=61, Parent=lf,
+                    })
+                    List(Enum.FillDirection.Vertical, 0, Enum.HorizontalAlignment.Left,
+                         Enum.VerticalAlignment.Top, inner)
 
                     for _, opt in ipairs(D.Options) do
                         local ob = New("TextButton", {
@@ -1140,7 +1153,7 @@ function Library:CreateWindow(opts)
                             BorderSizePixel=0, AutoButtonColor=false,
                             Font=Theme.Font, TextSize=Theme.Sz, Text="  "..opt,
                             TextColor3=Theme.Dim, TextXAlignment=Enum.TextXAlignment.Left,
-                            ZIndex=61, Parent=lf,
+                            ZIndex=61, Parent=inner,
                         })
                         local function refOpt()
                             local on = multi and D.Value[opt] or (D.Value==opt)
