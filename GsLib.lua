@@ -1147,6 +1147,12 @@ function Library:CreateWindow(opts)
                     List(Enum.FillDirection.Vertical, 0, Enum.HorizontalAlignment.Left,
                          Enum.VerticalAlignment.Top, inner)
 
+                    local SCROLL_STEP = 40
+                    local function doScroll(dir)
+                        local newY = inner.CanvasPosition.Y + dir * SCROLL_STEP
+                        newY = math.clamp(newY, 0, math.max(0, totalH - visH))
+                        inner.CanvasPosition = Vector2.new(0, newY)
+                    end
                     for _, opt in ipairs(D.Options) do
                         local ob = New("TextButton", {
                             Size=UDim2.new(1,0,0,20), BackgroundColor3=Theme.Panel,
@@ -1162,7 +1168,6 @@ function Library:CreateWindow(opts)
                             ob.BackgroundColor3= Theme.Panel
                         end
                         refOpt()
-                        -- hover: bolder, whiter, darker background (darker than the island)
                         ob.MouseEnter:Connect(function()
                             ob.Font = Theme.Bold
                             ob.TextColor3 = Color3.new(1,1,1)
@@ -1173,6 +1178,9 @@ function Library:CreateWindow(opts)
                             if multi then D.Value[opt]=not D.Value[opt]; refOpt(); display(); fire()
                             else D.Value=opt; display(); fire(); Win.CloseOverlays() end
                         end)
+                        -- Forward scroll events from items to the ScrollingFrame canvas
+                        ob.MouseWheelForward:Connect(function() doScroll(-1) end)
+                        ob.MouseWheelBackward:Connect(function() doScroll(1) end)
                     end
                 end
                 boxBtn.MouseButton1Click:Connect(function()
