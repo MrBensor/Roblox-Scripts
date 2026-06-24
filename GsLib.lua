@@ -1,3 +1,9 @@
+--[[
+    GsLib v2 – GameSense/Skeet-style UI Framework for Roblox executors
+    Modified for Operation One: legend-style group headers, no small corners,
+    slider +/- buttons, floating value label, white section text.
+]]
+
 local UIS        = game:GetService("UserInputService")
 local Tween      = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -388,6 +394,11 @@ local function mountColorPicker(holder, o, Win)
 
     local P = {}
     function P:Set(c) h,s,v = Color3.toHSV(c); rebuild() end
+    function P:SetFull(c, a)
+        h,s,v = Color3.toHSV(c)
+        if a ~= nil then alpha = math.clamp(a, 0, 1) end
+        rebuild()
+    end
     function P:Get() return col, alpha end
     function P:Open() openPopup() end
     return P
@@ -589,12 +600,9 @@ function Library:CreateWindow(opts)
         Size = UDim2.fromScale(1,1), BackgroundTransparency=1, ZIndex=50, Parent=main,
     })
     Win.Overlay = overlay
+    Win._config = {}   -- key → { type, widget }  for GetConfig/SetConfig
     function Win.CloseOverlays()
-        pcall(function()
-            for _, c in ipairs(overlay:GetChildren()) do
-                pcall(function() c.Parent = nil end)
-            end
-        end)
+        for _, c in ipairs(overlay:GetChildren()) do c:Destroy() end
     end
 
     local function syncBorder(mainPos)
@@ -831,6 +839,9 @@ function Library:CreateWindow(opts)
         if not Win.ActiveTab then selectTab(Tab) end
 
         -- ─── CreateGroup ─────────────────────────────
+        local function cfgReg(key, wtype, widget)
+            if key then Win._config[key] = { type = wtype, widget = widget } end
+        end
         function Tab:CreateGroup(groupOpts)
             groupOpts = groupOpts or {}
             local parentCol = (groupOpts.Side == "Right") and Tab.Right or Tab.Left
@@ -961,9 +972,12 @@ function Library:CreateWindow(opts)
                     return T2
                 end
                 function T2:AddKeybind(ko)
-                    mountKeybind(addons, ko or {}, Win); return T2
+                    local K = mountKeybind(addons, ko or {}, Win)
+                    T2.Keybind = K
+                    return T2
                 end
 
+                cfgReg(o.Key, "toggle", T2)
                 return T2
             end
 
@@ -1054,6 +1068,7 @@ function Library:CreateWindow(opts)
                 minusBtn.MouseButton1Click:Connect(function() S:Set(S.Value - _bs) end)
                 plusBtn.MouseButton1Click:Connect(function()  S:Set(S.Value + _bs) end)
                 S:Set(S.Value)
+                cfgReg(o.Key, "slider", S)
                 return S
             end
 
@@ -1151,7 +1166,6 @@ function Library:CreateWindow(opts)
                         newY = math.clamp(newY, 0, math.max(0, totalH - visH))
                         inner.CanvasPosition = Vector2.new(0, newY)
                     end
-                    local refOpts = {}
                     for _, opt in ipairs(D.Options) do
                         local ob = New("TextButton", {
                             Size=UDim2.new(1,0,0,20), BackgroundColor3=Theme.Panel,
@@ -1166,7 +1180,6 @@ function Library:CreateWindow(opts)
                             ob.TextColor3      = on and Theme.Accent or Theme.Dim
                             ob.BackgroundColor3= Theme.Panel
                         end
-                        table.insert(refOpts, refOpt)
                         refOpt()
                         ob.MouseEnter:Connect(function()
                             ob.Font = Theme.Bold
@@ -1176,7 +1189,7 @@ function Library:CreateWindow(opts)
                         ob.MouseLeave:Connect(refOpt)
                         ob.MouseButton1Click:Connect(function()
                             if multi then D.Value[opt]=not D.Value[opt]; refOpt(); display(); fire()
-                            else D.Value=opt; for _,rf in ipairs(refOpts) do rf() end; display(); fire(); Win.CloseOverlays() end
+                            else D.Value=opt; display(); fire(); Win.CloseOverlays() end
                         end)
                         -- Forward scroll events from items to the ScrollingFrame canvas
                         ob.MouseWheelForward:Connect(function() doScroll(-1) end)
@@ -1196,6 +1209,7 @@ function Library:CreateWindow(opts)
                 function D:SetOptions(opts2) D.Options=opts2 or {}; display() end
                 function D:SetVisible(vis) r.Visible = vis end  -- collapses in the list layout when hidden
                 display()
+                cfgReg(o.Key, "dropdown", D)
                 return D
             end
 
@@ -1215,7 +1229,9 @@ function Library:CreateWindow(opts)
                 })
                 List(Enum.FillDirection.Horizontal, 0,
                      Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Center, h2)
-                return mountColorPicker(h2, o, Win)
+                local P = mountColorPicker(h2, o, Win)
+                cfgReg(o.Key, "color", P)
+                return P
             end
 
             -- ═══ KEYBIND standalone ═════════════════
@@ -1234,7 +1250,9 @@ function Library:CreateWindow(opts)
                 })
                 List(Enum.FillDirection.Horizontal, 0,
                      Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Center, h2)
-                return mountKeybind(h2, o, Win)
+                local K = mountKeybind(h2, o, Win)
+                cfgReg(o.Key, "keybind", K)
+                return K
             end
 
             -- ═══ BUTTON ═════════════════════════════
@@ -1437,6 +1455,92 @@ function Library:CreateWindow(opts)
 
         return Tab
     end -- CreateTab
+
+    -- ══ CONFIG PERSISTENCE ══════════════════════════════════════════
+    -- Win:GetConfig()  → plain table, JSON-safe (no Color3/Enum values)
+    -- Win:SetConfig(t) → restores all keyed widgets; fires their callbacks
+    local function _c3out(c, a)
+        return { r = math.floor(c.R*255+.5), g = math.floor(c.G*255+.5), b = math.floor(c.B*255+.5) }, a
+    end
+    local function _c3in(t)
+        if type(t) ~= "table" then return nil end
+        return Color3.fromRGB(t.r or 0, t.g or 0, t.b or 0)
+    end
+    local function _kbin(s)
+        if type(s) ~= "string" then return nil end
+        local et, en = s:match("Enum%.(%a+)%.(.+)")
+        if not (et and en) then return nil end
+        local ok, k = pcall(function() return Enum[et][en] end)
+        return ok and k or nil
+    end
+
+    function Win:GetConfig()
+        local out = {}
+        for key, info in pairs(Win._config) do
+            local w = info.widget
+            if info.type == "toggle" then
+                out[key] = w:Get()
+                if w.Keybind then
+                    local kb = w.Keybind:Get()
+                    if kb then out["_kb_"..key] = tostring(kb) end
+                end
+                if w.ColorPicker then
+                    local c, a = w.ColorPicker:Get()
+                    if c then
+                        out["_cp_"..key], out["_ca_"..key] = _c3out(c, a)
+                    end
+                end
+            elseif info.type == "slider" then
+                out[key] = w:Get()
+            elseif info.type == "dropdown" then
+                local v = w:Get()
+                if type(v) == "table" then
+                    local arr = {}
+                    for opt in pairs(v) do arr[#arr+1] = opt end
+                    out[key] = arr
+                else
+                    out[key] = v
+                end
+            elseif info.type == "color" then
+                local c, a = w:Get()
+                if c then out[key], out["_ca_"..key] = _c3out(c, a) end
+            elseif info.type == "keybind" then
+                local kb = w:Get()
+                if kb then out[key] = tostring(kb) end
+            end
+        end
+        return out
+    end
+
+    function Win:SetConfig(data)
+        if type(data) ~= "table" then return end
+        for key, info in pairs(Win._config) do
+            local w = info.widget
+            if info.type == "toggle" then
+                local v = data[key]
+                if v ~= nil then pcall(function() w:Set(v == true) end) end
+                local kb = _kbin(data["_kb_"..key])
+                if kb and w.Keybind then pcall(function() w.Keybind:Set(kb) end) end
+                local cp = _c3in(data["_cp_"..key])
+                if cp and w.ColorPicker then
+                    pcall(function() w.ColorPicker:SetFull(cp, data["_ca_"..key] or 1) end)
+                end
+            elseif info.type == "slider" then
+                local v = data[key]
+                if v ~= nil then pcall(function() w:Set(v) end) end
+            elseif info.type == "dropdown" then
+                local v = data[key]
+                if v ~= nil then pcall(function() w:Set(v) end) end
+            elseif info.type == "color" then
+                local c = _c3in(data[key])
+                if c then pcall(function() w:SetFull(c, data["_ca_"..key] or 1) end) end
+            elseif info.type == "keybind" then
+                local kb = _kbin(data[key])
+                if kb then pcall(function() w:Set(kb) end) end
+            end
+        end
+    end
+    -- ════════════════════════════════════════════════════════════════
 
     return Win
 end -- CreateWindow
