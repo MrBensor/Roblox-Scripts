@@ -1,9 +1,3 @@
---[[
-    GsLib v2 – GameSense/Skeet-style UI Framework for Roblox executors
-    Modified for Operation One: legend-style group headers, no small corners,
-    slider +/- buttons, floating value label, white section text.
-]]
-
 local UIS        = game:GetService("UserInputService")
 local Tween      = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
@@ -596,7 +590,11 @@ function Library:CreateWindow(opts)
     })
     Win.Overlay = overlay
     function Win.CloseOverlays()
-        for _, c in ipairs(overlay:GetChildren()) do c:Destroy() end
+        pcall(function()
+            for _, c in ipairs(overlay:GetChildren()) do
+                pcall(function() c.Parent = nil end)
+            end
+        end)
     end
 
     local function syncBorder(mainPos)
@@ -1153,6 +1151,7 @@ function Library:CreateWindow(opts)
                         newY = math.clamp(newY, 0, math.max(0, totalH - visH))
                         inner.CanvasPosition = Vector2.new(0, newY)
                     end
+                    local refOpts = {}
                     for _, opt in ipairs(D.Options) do
                         local ob = New("TextButton", {
                             Size=UDim2.new(1,0,0,20), BackgroundColor3=Theme.Panel,
@@ -1167,6 +1166,7 @@ function Library:CreateWindow(opts)
                             ob.TextColor3      = on and Theme.Accent or Theme.Dim
                             ob.BackgroundColor3= Theme.Panel
                         end
+                        table.insert(refOpts, refOpt)
                         refOpt()
                         ob.MouseEnter:Connect(function()
                             ob.Font = Theme.Bold
@@ -1176,7 +1176,7 @@ function Library:CreateWindow(opts)
                         ob.MouseLeave:Connect(refOpt)
                         ob.MouseButton1Click:Connect(function()
                             if multi then D.Value[opt]=not D.Value[opt]; refOpt(); display(); fire()
-                            else D.Value=opt; display(); fire(); Win.CloseOverlays() end
+                            else D.Value=opt; for _,rf in ipairs(refOpts) do rf() end; display(); fire(); Win.CloseOverlays() end
                         end)
                         -- Forward scroll events from items to the ScrollingFrame canvas
                         ob.MouseWheelForward:Connect(function() doScroll(-1) end)
