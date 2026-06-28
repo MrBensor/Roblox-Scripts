@@ -189,6 +189,99 @@ function Library:Notify(o)
     end)
 end
 
+function Library:NotifyProgress(o)
+    o = o or {}
+    local toast = New("Frame", {
+        Size = UDim2.fromOffset(280, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundColor3 = Theme.Panel,
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        Parent = NotifHolder,
+    })
+    Stroke(Theme.IslandBorder, 1, toast)
+    New("Frame", {
+        Size = UDim2.new(0, 2, 1, 0),
+        BackgroundColor3 = Theme.Accent,
+        BorderSizePixel = 0, ZIndex = 2,
+        Parent = toast,
+    })
+    local inner = New("Frame", {
+        Size = UDim2.new(1, -14, 0, 0),
+        Position = UDim2.fromOffset(10, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        BackgroundTransparency = 1,
+        Parent = toast,
+    })
+    Pad(8, 8, 0, 0, inner)
+    List(Enum.FillDirection.Vertical, 3, Enum.HorizontalAlignment.Left, Enum.VerticalAlignment.Top, inner)
+    if o.Title and o.Title ~= "" then
+        New("TextLabel", {
+            Size = UDim2.new(1, 0, 0, 16),
+            BackgroundTransparency = 1,
+            Font = Theme.Bold, TextSize = 13,
+            Text = o.Title, TextColor3 = Theme.Text,
+            TextXAlignment = Enum.TextXAlignment.Left, Parent = inner,
+        })
+    end
+    if o.Text and o.Text ~= "" then
+        New("TextLabel", {
+            Size = UDim2.new(1, 0, 0, 0),
+            AutomaticSize = Enum.AutomaticSize.Y,
+            BackgroundTransparency = 1,
+            Font = Theme.Font, TextSize = 12,
+            Text = o.Text, TextColor3 = Theme.Dim,
+            TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, Parent = inner,
+        })
+    end
+    local progRow = New("Frame", {
+        Size = UDim2.new(1, 0, 0, 16),
+        BackgroundTransparency = 1,
+        Parent = inner,
+    })
+    local barBg = New("Frame", {
+        Size = UDim2.new(1, -62, 0, 5),
+        Position = UDim2.new(0, 0, 0.5, -2),
+        BackgroundColor3 = Theme.Elem,
+        BorderSizePixel = 0,
+        Parent = progRow,
+    })
+    local barFill = New("Frame", {
+        Size = UDim2.fromScale(0, 1),
+        BackgroundColor3 = Theme.Accent,
+        BorderSizePixel = 0,
+        Parent = barBg,
+    })
+    local statusLbl = New("TextLabel", {
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, 0, 0.5, 0),
+        Size = UDim2.fromOffset(58, 16),
+        BackgroundTransparency = 1,
+        Font = Theme.Font, TextSize = 10,
+        Text = "0/0", TextColor3 = Theme.Dim,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        Parent = progRow,
+    })
+    tw(toast, 0.18, { BackgroundTransparency = 0 })
+    local t0 = tick()
+    local N = {}
+    function N:Update(cur, tot)
+        local pct = (tot > 0) and (cur / tot) or 0
+        barFill.Size = UDim2.fromScale(pct, 1)
+        local eta = ""
+        local el = tick() - t0
+        if cur > 0 and cur < tot then
+            eta = string.format(" ~%.0fs", el / cur * (tot - cur))
+        end
+        statusLbl.Text = cur .. "/" .. tot .. eta
+    end
+    function N:Close()
+        tw(toast, 0.18, { BackgroundTransparency = 1 })
+        task.delay(0.22, function() pcall(function() toast:Destroy() end) end)
+    end
+    return N
+end
+
 -- ══════════════════════════════════════════
 --   COLORPICKER
 -- ══════════════════════════════════════════
