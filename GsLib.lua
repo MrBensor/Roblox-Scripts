@@ -500,6 +500,8 @@ end
 -- ══════════════════════════════════════════
 --   KEYBIND
 -- ══════════════════════════════════════════
+local KEYBIND_MODES      = { "Toggle", "Hold", "Always" }
+local KEYBIND_MODE_LABEL = { Toggle = "Toggle", Hold = "On Hotkey", Always = "Always On" }
 local function mountKeybind(holder, o, Win)
     o = o or {}
     local key      = o.Default
@@ -540,15 +542,78 @@ local function mountKeybind(holder, o, Win)
         lbl.TextColor3 = listening and Color3.fromRGB(220, 60, 60) or Theme.Dim
     end
 
-    New("TextButton", {
+    local btn = New("TextButton", {
         Size = UDim2.fromScale(1,1), BackgroundTransparency=1, Text="",
         Parent = lbl,
-    }).MouseButton1Click:Connect(function() listening=true; refresh() end)
+    })
+    btn.MouseButton1Click:Connect(function() Win.CloseOverlays(); listening=true; refresh() end)
 
     local function matches(i)
         return (typeof(key)=="EnumItem" and key.EnumType==Enum.KeyCode and i.KeyCode==key)
             or (i.UserInputType == key)
     end
+
+    local function fireCallback(v)
+        if o.Callback then pcall(o.Callback, v) end
+    end
+
+    -- Right-click: small dropdown (Toggle / On Hotkey / Always On), selected entry lit in the
+    -- live accent color. "Always On" fires the callback immediately and keeps it active until
+    -- switched to a different mode.
+    local function setMode(newMode)
+        local prevMode = mode
+        mode = newMode
+        if mode == "Always" then
+            active = true
+            fireCallback(true)
+        elseif prevMode == "Always" and mode ~= "Always" then
+            active = false
+            fireCallback(false)
+        end
+    end
+
+    btn.MouseButton2Click:Connect(function()
+        Win.CloseOverlays()
+        local rowH, pad = 18, 4
+        local popW, popH = 96, pad*2 + #KEYBIND_MODES*rowH
+
+        New("TextButton", {
+            Size = UDim2.fromScale(1,1), BackgroundTransparency = 1, Text = "",
+            AutoButtonColor = false, ZIndex = 55, Parent = Win.Overlay,
+        }).MouseButton1Click:Connect(function() Win.CloseOverlays() end)
+
+        local pop = New("TextButton", {
+            Size = UDim2.fromOffset(popW, popH),
+            BackgroundColor3 = Theme.Panel,
+            BorderSizePixel = 0, ZIndex = 70, Parent = Win.Overlay,
+            Text = "", AutoButtonColor = false,
+        })
+        Stroke(Theme.IslandBorder, 1, pop)
+
+        local ap = lbl.AbsolutePosition
+        local mp = Win.Main.AbsolutePosition
+        local ms = Win.Main.AbsoluteSize
+        local px = math.clamp(ap.X - mp.X, 4, math.max(4, ms.X - popW - 4))
+        local py = math.clamp(ap.Y - mp.Y + lbl.AbsoluteSize.Y + 4, 4, math.max(4, ms.Y - popH - 4))
+        pop.Position = UDim2.fromOffset(px, py)
+
+        for i, m in ipairs(KEYBIND_MODES) do
+            local row = New("TextButton", {
+                Size = UDim2.new(1, -2*pad, 0, rowH),
+                Position = UDim2.fromOffset(pad, pad + (i-1)*rowH),
+                BackgroundTransparency = 1, ZIndex = 71,
+                Font = Theme.Font, TextSize = 11,
+                Text = KEYBIND_MODE_LABEL[m],
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextColor3 = (m == mode) and Theme.Accent or Theme.Dim,
+                AutoButtonColor = false, Parent = pop,
+            })
+            row.MouseButton1Click:Connect(function()
+                setMode(m)
+                Win.CloseOverlays()
+            end)
+        end
+    end)
 
     local c1 = UIS.InputBegan:Connect(function(i, gpe)
         if listening then
@@ -563,29 +628,33 @@ local function mountKeybind(holder, o, Win)
             end
             listening=false; refresh(); return
         end
-        if gpe or not key then return end
+        if gpe or not key or mode == "Always" then return end
         if matches(i) then
             if mode=="Toggle" then
                 active = not active
-                if o.Callback then pcall(o.Callback, active) end
+                fireCallback(active)
             elseif mode=="Hold" then
                 active=true
-                if o.Callback then pcall(o.Callback, true) end
+                fireCallback(true)
             end
         end
     end)
     local c2 = UIS.InputEnded:Connect(function(i)
         if key and matches(i) and mode=="Hold" then
             active=false
-            if o.Callback then pcall(o.Callback, false) end
+            fireCallback(false)
         end
     end)
     table.insert(Win.Conns, c1)
     table.insert(Win.Conns, c2)
 
+    if mode == "Always" then task.defer(fireCallback, true) end
+
     local K = {}
     function K:Set(k) key=k; refresh() end
     function K:Get() return key, mode, active end
+    function K:GetMode() return mode end
+    function K:SetMode(m) setMode(m) end
     function K:IsActive() return mode=="Always" or active end
     return K
 end
