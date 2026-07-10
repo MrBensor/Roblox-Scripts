@@ -628,7 +628,7 @@ local function mountKeybind(holder, o, Win)
             end
             listening=false; refresh(); return
         end
-        if gpe or not key or mode == "Always" then return end
+        if not key or mode == "Always" then return end
         if matches(i) then
             if mode=="Toggle" then
                 active = not active
@@ -682,7 +682,7 @@ function Library:CreateWindow(opts)
     local gui = New("ScreenGui", {
         Name = "GsLib_" .. math.random(1000,9999),
         ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-        DisplayOrder = 9999, IgnoreGuiInset = true,
+        DisplayOrder = 2147483647, IgnoreGuiInset = true,
     })
     protect(gui)
     gui.Parent  = getParent()
