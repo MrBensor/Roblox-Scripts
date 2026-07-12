@@ -301,8 +301,10 @@ local function mountColorPicker(holder, o, Win)
 
     local function rebuild()
         col = Color3.fromHSV(h, s, v)
-        swatch.BackgroundColor3 = col
-        swatch.BackgroundTransparency = 1 - alpha  -- swatch shows current opacity
+        pcall(function()
+            swatch.BackgroundColor3 = col
+            swatch.BackgroundTransparency = 1 - alpha
+        end)
         if o.Callback then pcall(o.Callback, col, alpha) end
     end
 
@@ -1113,8 +1115,10 @@ function Library:CreateWindow(opts)
 
                 function T2:Set(vv)
                     T2.Value = vv
-                    sq.BackgroundColor3 = vv and Theme.Accent or Theme.CheckOff
-                    lbl2.TextColor3     = vv and Theme.Text or Theme.Dim
+                    pcall(function()
+                        sq.BackgroundColor3 = vv and Theme.Accent or Theme.CheckOff
+                        lbl2.TextColor3     = vv and Theme.Text or Theme.Dim
+                    end)
                     if o.Callback then pcall(o.Callback, vv) end
                 end
                 function T2:Get() return T2.Value end
@@ -1203,10 +1207,12 @@ function Library:CreateWindow(opts)
                     vv = math.clamp(vv, mn, mx)
                     if dec==0 then vv = math.floor(vv+.5) end
                     S.Value = vv
-                    local rel = (vv-mn)/(mx-mn)
-                    fill.Size = UDim2.fromScale(rel, 1)
-                    trackLbl.Text = fmt(vv)
-                    trackLbl.Position = UDim2.new(math.clamp(rel,0.12,0.88),0,0,1)
+                    pcall(function()
+                        local rel = (vv-mn)/(mx-mn)
+                        fill.Size = UDim2.fromScale(rel, 1)
+                        trackLbl.Text = fmt(vv)
+                        trackLbl.Position = UDim2.new(math.clamp(rel,0.12,0.88),0,0,1)
+                    end)
                     if o.Callback then pcall(o.Callback, vv) end
                 end
                 function S:Get() return S.Value end
@@ -1365,7 +1371,8 @@ function Library:CreateWindow(opts)
                     if multi then D.Value={}
                         if type(vv)=="table" then for _,d in ipairs(vv) do D.Value[d]=true end end
                     else D.Value=vv end
-                    display(); fire()
+                    pcall(display)
+                    fire()
                 end
                 function D:Get() return D.Value end
                 function D:SetOptions(opts2) D.Options=opts2 or {}; display() end
