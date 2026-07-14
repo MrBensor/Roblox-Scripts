@@ -1217,15 +1217,15 @@ function Library:CreateWindow(opts)
                     return tostring(math.floor(vv))..(o.Suffix or "")
                 end
                 function S:Set(vv)
+                    vv = tonumber(vv)
+                    if not vv then return end
                     vv = math.clamp(vv, mn, mx)
                     if dec==0 then vv = math.floor(vv+.5) end
                     S.Value = vv
-                    pcall(function()
-                        local rel = (vv-mn)/(mx-mn)
-                        fill.Size = UDim2.fromScale(rel, 1)
-                        trackLbl.Text = fmt(vv)
-                        trackLbl.Position = UDim2.new(math.clamp(rel,0.12,0.88),0,0,1)
-                    end)
+                    local rel = (mx > mn) and ((vv-mn)/(mx-mn)) or 0
+                    fill.Size = UDim2.fromScale(rel, 1)
+                    trackLbl.Text = fmt(vv)
+                    trackLbl.Position = UDim2.new(math.clamp(rel,0.12,0.88),0,0,1)
                     if o.Callback then pcall(o.Callback, vv) end
                 end
                 function S:Get() return S.Value end
