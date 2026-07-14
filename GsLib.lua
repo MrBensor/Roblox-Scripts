@@ -1003,13 +1003,26 @@ function Library:CreateWindow(opts)
         if not Win.ActiveTab then selectTab(Tab) end
 
         -- ─── CreateGroup ─────────────────────────────
-        local function cfgReg(key, wtype, widget)
-            if key then Win._config[key] = { type = wtype, widget = widget } end
+        -- Every widget is persisted. An explicit Key wins; without one a stable key is
+        -- derived from tab/group/type/text so nothing can silently drop out of the config.
+        local autoSeen = {}
+        local function autoKey(groupName, wtype, text)
+            local base = string.format("@%s.%s.%s.%s",
+                name, groupName or "?", wtype, tostring(text or "?"))
+            local n = (autoSeen[base] or 0) + 1
+            autoSeen[base] = n
+            return n > 1 and (base .. "#" .. n) or base
         end
         function Tab:CreateGroup(groupOpts)
             groupOpts = groupOpts or {}
             local parentCol = (groupOpts.Side == "Right") and Tab.Right or Tab.Left
             local G = {}
+            local groupName = groupOpts.Name or "Group"
+
+            local function cfgReg(key, wtype, widget, text)
+                Win._config[key or autoKey(groupName, wtype, text)] =
+                    { type = wtype, widget = widget }
+            end
 
             -- sharp island (no rounding, no UIStroke); border is drawn as 1px frames
             local box = New("Frame", {
@@ -1143,7 +1156,7 @@ function Library:CreateWindow(opts)
                     return T2
                 end
 
-                cfgReg(o.Key, "toggle", T2)
+                cfgReg(o.Key, "toggle", T2, o.Text)
                 return T2
             end
 
@@ -1236,7 +1249,7 @@ function Library:CreateWindow(opts)
                 minusBtn.MouseButton1Click:Connect(function() S:Set(S.Value - _bs) end)
                 plusBtn.MouseButton1Click:Connect(function()  S:Set(S.Value + _bs) end)
                 S:Set(S.Value)
-                cfgReg(o.Key, "slider", S)
+                cfgReg(o.Key, "slider", S, o.Text)
                 return S
             end
 
@@ -1378,7 +1391,7 @@ function Library:CreateWindow(opts)
                 function D:SetOptions(opts2) D.Options=opts2 or {}; display() end
                 function D:SetVisible(vis) r.Visible = vis end  -- collapses in the list layout when hidden
                 display()
-                cfgReg(o.Key, "dropdown", D)
+                cfgReg(o.Key, "dropdown", D, o.Text)
                 return D
             end
 
@@ -1399,7 +1412,7 @@ function Library:CreateWindow(opts)
                 List(Enum.FillDirection.Horizontal, 0,
                      Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Center, h2)
                 local P = mountColorPicker(h2, o, Win)
-                cfgReg(o.Key, "color", P)
+                cfgReg(o.Key, "color", P, o.Text)
                 return P
             end
 
@@ -1420,7 +1433,7 @@ function Library:CreateWindow(opts)
                 List(Enum.FillDirection.Horizontal, 0,
                      Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Center, h2)
                 local K = mountKeybind(h2, o, Win)
-                cfgReg(o.Key, "keybind", K)
+                cfgReg(o.Key, "keybind", K, o.Text)
                 return K
             end
 
@@ -1514,6 +1527,7 @@ function Library:CreateWindow(opts)
                 local I = {}
                 function I:Get() return box.Text end
                 function I:Set(t) box.Text=t end
+                cfgReg(o.Key, "input", I, o.Text)
                 return I
             end
 
@@ -1650,8 +1664,9 @@ function Library:CreateWindow(opts)
             if info.type == "toggle" then
                 out[key] = w:Get()
                 if w.Keybind then
-                    local kb = w.Keybind:Get()
+                    local kb, md = w.Keybind:Get()
                     if kb then out["_kb_"..key] = tostring(kb) end
+                    if md then out["_km_"..key] = md end
                 end
                 if w.ColorPicker then
                     local c, a = w.ColorPicker:Get()
@@ -1660,6 +1675,8 @@ function Library:CreateWindow(opts)
                     end
                 end
             elseif info.type == "slider" then
+                out[key] = w:Get()
+            elseif info.type == "input" then
                 out[key] = w:Get()
             elseif info.type == "dropdown" then
                 local v = w:Get()
@@ -1674,8 +1691,9 @@ function Library:CreateWindow(opts)
                 local c, a = w:Get()
                 if c then out[key], out["_ca_"..key] = _c3out(c, a) end
             elseif info.type == "keybind" then
-                local kb = w:Get()
+                local kb, md = w:Get()
                 if kb then out[key] = tostring(kb) end
+                if md then out["_km_"..key] = md end
             end
         end
         return out
@@ -1690,6 +1708,8 @@ function Library:CreateWindow(opts)
                 if v ~= nil then pcall(function() w:Set(v == true) end) end
                 local kb = _kbin(data["_kb_"..key])
                 if kb and w.Keybind then pcall(function() w.Keybind:Set(kb) end) end
+                local md = data["_km_"..key]
+                if md and w.Keybind then pcall(function() w.Keybind:SetMode(md) end) end
                 local cp = _c3in(data["_cp_"..key])
                 if cp and w.ColorPicker then
                     pcall(function() w.ColorPicker:SetFull(cp, data["_ca_"..key] or 1) end)
@@ -1697,6 +1717,9 @@ function Library:CreateWindow(opts)
             elseif info.type == "slider" then
                 local v = data[key]
                 if v ~= nil then pcall(function() w:Set(v) end) end
+            elseif info.type == "input" then
+                local v = data[key]
+                if v ~= nil then pcall(function() w:Set(tostring(v)) end) end
             elseif info.type == "dropdown" then
                 local v = data[key]
                 if v ~= nil then pcall(function() w:Set(v) end) end
@@ -1706,6 +1729,8 @@ function Library:CreateWindow(opts)
             elseif info.type == "keybind" then
                 local kb = _kbin(data[key])
                 if kb then pcall(function() w:Set(kb) end) end
+                local md = data["_km_"..key]
+                if md then pcall(function() w:SetMode(md) end) end
             end
         end
     end
