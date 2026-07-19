@@ -315,7 +315,7 @@ local function mountColorPicker(holder, o, Win)
 
     local function openPopup()
         Win.CloseOverlays()
-        local popH = PAD + SVH + (alpha ~= nil and 18 or 0) + PAD
+        local popH = PAD + SVH + (alpha ~= nil and (18 + 24) or 0) + PAD
 
         -- click-outside catcher closes the popup
         New("TextButton", {
@@ -411,7 +411,7 @@ local function mountColorPicker(holder, o, Win)
         end
         if alpha ~= nil then
             local ab = New("ImageButton", {
-                Size = UDim2.fromOffset(SVW, 10),
+                Size = UDim2.fromOffset(SVW + GAP + HUEW, 10),
                 Position = UDim2.fromOffset(PAD, PAD + SVH + 8),
                 BackgroundColor3 = Color3.fromRGB(20,20,20),
                 BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 71, Parent = pop,
@@ -452,8 +452,8 @@ local function mountColorPicker(holder, o, Win)
                 pcall(function() c2:Disconnect() end)
             end)
 
-            local cpX, cpY = PAD + SVW, PAD + SVH
-            local cpW, cpH = GAP + HUEW, (popH - PAD) - cpY
+            local cpRowW = SVW + GAP + HUEW
+            local cpY = PAD + SVH + 8 + 10 + 6
             local function pasteApply()
                 if not _cpClipboard then return end
                 h, s, v = Color3.toHSV(_cpClipboard.col)
@@ -466,14 +466,14 @@ local function mountColorPicker(holder, o, Win)
                 rebuild()
             end
             local copyBtn = New("TextButton", {
-                Size = UDim2.fromOffset(cpW / 2, cpH), Position = UDim2.fromOffset(cpX, cpY),
+                Size = UDim2.fromOffset(cpRowW / 2 - 2, 18), Position = UDim2.fromOffset(PAD, cpY),
                 BackgroundColor3 = Theme.Elem, BorderSizePixel = 0, AutoButtonColor = false,
                 Font = Theme.Bold, TextSize = 13, TextColor3 = Theme.Text, Text = "C",
                 ZIndex = 71, Parent = pop,
             })
             Stroke(Theme.Border, 1, copyBtn)
             local pasteBtn = New("TextButton", {
-                Size = UDim2.fromOffset(cpW / 2, cpH), Position = UDim2.fromOffset(cpX + cpW / 2, cpY),
+                Size = UDim2.fromOffset(cpRowW / 2 - 2, 18), Position = UDim2.fromOffset(PAD + cpRowW / 2 + 2, cpY),
                 BackgroundColor3 = Theme.Elem, BorderSizePixel = 0, AutoButtonColor = false,
                 Font = Theme.Bold, TextSize = 13, TextColor3 = Theme.Text, Text = "V",
                 ZIndex = 71, Parent = pop,
