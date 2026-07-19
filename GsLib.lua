@@ -285,6 +285,7 @@ end
 -- ══════════════════════════════════════════
 --   COLORPICKER
 -- ══════════════════════════════════════════
+local _cpClipboard = nil
 local function mountColorPicker(holder, o, Win)
     o = o or {}
     local col    = o.Default or Color3.new(1, 1, 1)
@@ -410,7 +411,7 @@ local function mountColorPicker(holder, o, Win)
         end
         if alpha ~= nil then
             local ab = New("ImageButton", {
-                Size = UDim2.fromOffset(SVW + GAP + HUEW, 10),
+                Size = UDim2.fromOffset(SVW, 10),
                 Position = UDim2.fromOffset(PAD, PAD + SVH + 8),
                 BackgroundColor3 = Color3.fromRGB(20,20,20),
                 BorderSizePixel = 0, AutoButtonColor = false, ZIndex = 71, Parent = pop,
@@ -450,6 +451,36 @@ local function mountColorPicker(holder, o, Win)
                 pcall(function() c1:Disconnect() end)
                 pcall(function() c2:Disconnect() end)
             end)
+
+            local cpX, cpY = PAD + SVW, PAD + SVH
+            local cpW, cpH = GAP + HUEW, (popH - PAD) - cpY
+            local function pasteApply()
+                if not _cpClipboard then return end
+                h, s, v = Color3.toHSV(_cpClipboard.col)
+                alpha = _cpClipboard.alpha
+                updateCur()
+                hueCur.Position = UDim2.new(.5, 0, h, 0)
+                sv.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+                refreshAlphaColor()
+                pcall(function() alphaCur.Position = UDim2.new(alpha, 0, .5, 0) end)
+                rebuild()
+            end
+            local copyBtn = New("TextButton", {
+                Size = UDim2.fromOffset(cpW / 2, cpH), Position = UDim2.fromOffset(cpX, cpY),
+                BackgroundColor3 = Theme.Elem, BorderSizePixel = 0, AutoButtonColor = false,
+                Font = Theme.Bold, TextSize = 13, TextColor3 = Theme.Text, Text = "C",
+                ZIndex = 71, Parent = pop,
+            })
+            Stroke(Theme.Border, 1, copyBtn)
+            local pasteBtn = New("TextButton", {
+                Size = UDim2.fromOffset(cpW / 2, cpH), Position = UDim2.fromOffset(cpX + cpW / 2, cpY),
+                BackgroundColor3 = Theme.Elem, BorderSizePixel = 0, AutoButtonColor = false,
+                Font = Theme.Bold, TextSize = 13, TextColor3 = Theme.Text, Text = "V",
+                ZIndex = 71, Parent = pop,
+            })
+            Stroke(Theme.Border, 1, pasteBtn)
+            copyBtn.MouseButton1Click:Connect(function() _cpClipboard = { col = col, alpha = alpha } end)
+            pasteBtn.MouseButton1Click:Connect(pasteApply)
         end
 
         local svD, hD = false, false
