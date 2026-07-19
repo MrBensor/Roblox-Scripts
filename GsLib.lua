@@ -434,7 +434,8 @@ local function mountColorPicker(holder, o, Win)
             local aD = false
             local function aUp(p)
                 alpha = math.clamp((p.X - ab.AbsolutePosition.X) / ab.AbsoluteSize.X, 0, 1)
-                alphaCur.Position = UDim2.new(alpha,0,.5,0); rebuild()
+                pcall(function() alphaCur.Position = UDim2.new(alpha,0,.5,0) end)
+                rebuild()
             end
             ab.InputBegan:Connect(function(i)
                 if i.UserInputType == Enum.UserInputType.MouseButton1 then aD=true; aUp(i.Position) end
