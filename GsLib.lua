@@ -340,6 +340,11 @@ local function mountColorPicker(holder, o, Win)
         px = math.clamp(px, 4, math.max(4, ms.X - popW - 4))
         local py = ap.Y - mp.Y + swatch.AbsoluteSize.Y + 4
         py = math.clamp(py, 4, math.max(4, ms.Y - popH - 4))
+        if Win.Compact then
+            local s = Win.Main:FindFirstChildOfClass("UIScale")
+            local scale = (s and s.Scale) or 1
+            px, py = px / scale, py / scale
+        end
         pop.Position = UDim2.fromOffset(px, py)
 
         -- ── SV (shade) field ──────────────────────
@@ -629,6 +634,11 @@ local function mountKeybind(holder, o, Win)
         local ms = Win.Main.AbsoluteSize
         local px = math.clamp(ap.X - mp.X, 4, math.max(4, ms.X - popW - 4))
         local py = math.clamp(ap.Y - mp.Y + lbl.AbsoluteSize.Y + 4, 4, math.max(4, ms.Y - popH - 4))
+        if Win.Compact then
+            local s = Win.Main:FindFirstChildOfClass("UIScale")
+            local scale = (s and s.Scale) or 1
+            px, py = px / scale, py / scale
+        end
         pop.Position = UDim2.fromOffset(px, py)
 
         for i, m in ipairs(KEYBIND_MODES) do
@@ -708,6 +718,10 @@ function Library:CreateWindow(opts)
 
     local Win   = { Tabs={}, ActiveTab=nil, ToggleKey=opts.ToggleKey or Enum.KeyCode.Insert,
                     Visible=true, Conns={}, Accents={} }
+    Win.Compact = opts.Compact and true or false
+    local compactScale = Win.Compact and (opts.CompactScale or 0.72) or 1
+    local sidebarW = Win.Compact and 96 or 54
+    local visW, visH = sz.X * compactScale, sz.Y * compactScale
 
     -- every accent-coloured element registers a closure here; SetAccent re-runs them
     -- so a single accent variable drives the whole UI and is changeable at runtime.
@@ -724,8 +738,8 @@ function Library:CreateWindow(opts)
 
     local outerBorder = New("Frame", {
         Name = "OuterBorder",
-        Size = UDim2.fromOffset(sz.X + 10, sz.Y + 10),
-        Position = UDim2.new(.5, -sz.X/2 - 5, .5, -sz.Y/2 - 5),
+        Size = UDim2.fromOffset(visW + 10, visH + 10),
+        Position = UDim2.new(.5, -visW/2 - 5, .5, -visH/2 - 5),
         BackgroundColor3 = Theme.OuterBg,
         BorderSizePixel = 0,
         Parent = gui,
@@ -736,12 +750,15 @@ function Library:CreateWindow(opts)
     local main = New("Frame", {
         Name = "Main",
         Size = UDim2.fromOffset(sz.X, sz.Y),
-        Position = UDim2.new(.5, -sz.X/2, .5, -sz.Y/2),
+        Position = UDim2.new(.5, -visW/2, .5, -visH/2),
         BackgroundColor3 = Theme.Bg, BorderSizePixel = 0,
         ClipsDescendants = true, Active = true, Parent = gui,
     })
     Stroke(Theme.Border, 2, main)
     Win.Main = main
+    if Win.Compact then
+        New("UIScale", { Scale = compactScale, Parent = main })
+    end
 
     local rainbowBar = New("Frame", {
         Size = UDim2.new(1, 0, 0, 2),
@@ -759,7 +776,7 @@ function Library:CreateWindow(opts)
 
     local sidebar = New("Frame", {
         Name = "Sidebar",
-        Size = UDim2.new(0, 54, 1, 0),
+        Size = UDim2.new(0, sidebarW, 1, 0),
         BackgroundColor3 = Theme.Sidebar, BorderSizePixel = 0, Parent = main,
     })
     local sidebarBorder = New("Frame", {
@@ -782,12 +799,23 @@ function Library:CreateWindow(opts)
         Size = UDim2.new(1,0,1,-36), Position = UDim2.fromOffset(0,36),
         BackgroundTransparency = 1, ZIndex = 2, Parent = sidebar,
     })
-    List(Enum.FillDirection.Vertical, 2, Enum.HorizontalAlignment.Center,
-         Enum.VerticalAlignment.Top, tabList)
+    if Win.Compact then
+        New("UIGridLayout", {
+            CellSize = UDim2.fromOffset(sidebarW/2 - 4, 40),
+            CellPadding = UDim2.fromOffset(2, 2),
+            FillDirectionMaxCells = 2,
+            SortOrder = Enum.SortOrder.LayoutOrder,
+            HorizontalAlignment = Enum.HorizontalAlignment.Center,
+            Parent = tabList,
+        })
+    else
+        List(Enum.FillDirection.Vertical, 2, Enum.HorizontalAlignment.Center,
+             Enum.VerticalAlignment.Top, tabList)
+    end
 
     local content = New("Frame", {
         Name = "Content",
-        Size = UDim2.new(1,-55,1,0), Position = UDim2.fromOffset(55,0),
+        Size = UDim2.new(1,-(sidebarW+1),1,0), Position = UDim2.fromOffset(sidebarW+1,0),
         BackgroundTransparency = 1, Parent = main,
     })
     Win.Content = content
@@ -1360,7 +1388,15 @@ function Library:CreateWindow(opts)
                         ZIndex=60, ClipsDescendants=true,
                         Size=UDim2.fromOffset(boxBtn.AbsoluteSize.X, visH), Parent=overlay,
                     })
-                    lf.Position = UDim2.fromOffset(ap.X-mp.X, ap.Y-mp.Y+boxBtn.AbsoluteSize.Y+3)
+                    do
+                        local lx, ly = ap.X-mp.X, ap.Y-mp.Y+boxBtn.AbsoluteSize.Y+3
+                        if Win.Compact then
+                            local s = main:FindFirstChildOfClass("UIScale")
+                            local scale = (s and s.Scale) or 1
+                            lx, ly = lx / scale, ly / scale
+                        end
+                        lf.Position = UDim2.fromOffset(lx, ly)
+                    end
                     local sbW = totalH > MAX_H and 4 or 0
                     local inner = New("ScrollingFrame", {
                         BackgroundTransparency=1, BorderSizePixel=0,
