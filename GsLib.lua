@@ -799,8 +799,9 @@ function Library:CreateWindow(opts)
         Size = UDim2.new(1,0,1,-36), Position = UDim2.fromOffset(0,36),
         BackgroundTransparency = 1, ZIndex = 2, Parent = sidebar,
     })
+    local TAB_MAX_H = 52
     if Win.Compact then
-        New("UIGridLayout", {
+        Win._tabGrid = New("UIGridLayout", {
             CellSize = UDim2.fromOffset(sidebarW/2 - 4, 40),
             CellPadding = UDim2.fromOffset(2, 2),
             FillDirectionMaxCells = 2,
@@ -808,9 +809,26 @@ function Library:CreateWindow(opts)
             HorizontalAlignment = Enum.HorizontalAlignment.Center,
             Parent = tabList,
         })
+        function Win:_RecomputeTabGrid()
+            local n = math.max(#Win.Tabs, 1)
+            local rows = math.ceil(n / 2)
+            local pad = 2
+            local listH = sz.Y - 36
+            local cellH = math.min(TAB_MAX_H, math.floor((listH - (rows - 1) * pad) / rows))
+            Win._tabGrid.CellSize = UDim2.fromOffset(sidebarW/2 - 4, math.max(cellH, 40))
+        end
     else
         List(Enum.FillDirection.Vertical, 2, Enum.HorizontalAlignment.Center,
              Enum.VerticalAlignment.Top, tabList)
+        function Win:_RecomputeTabGrid()
+            local n = math.max(#Win.Tabs, 1)
+            local pad = 2
+            local listH = sz.Y - 36
+            local rowH = math.max(32, math.min(TAB_MAX_H, math.floor((listH - (n - 1) * pad) / n)))
+            for _, t in ipairs(Win.Tabs) do
+                if t.BtnFrame then t.BtnFrame.Size = UDim2.new(1, 0, 0, rowH) end
+            end
+        end
     end
 
     local content = New("Frame", {
@@ -979,8 +997,9 @@ function Library:CreateWindow(opts)
         local btn = New("TextButton", {
             Size = UDim2.fromScale(1,1), BackgroundTransparency=1, Text="", Parent=btnFrame,
         })
-        Tab.Btn     = iconFrame:FindFirstChildOfClass("TextLabel") or iconFrame:FindFirstChildOfClass("ImageLabel")
-        Tab.SideBar = acBar
+        Tab.Btn      = iconFrame:FindFirstChildOfClass("TextLabel") or iconFrame:FindFirstChildOfClass("ImageLabel")
+        Tab.SideBar  = acBar
+        Tab.BtnFrame = btnFrame
 
         btn.MouseEnter:Connect(function()
             tw(hovBg, .12, { BackgroundTransparency = 0.82 })
@@ -1060,6 +1079,7 @@ function Library:CreateWindow(opts)
         Tab.Right = makeCol(.5,  8)
 
         table.insert(Win.Tabs, Tab)
+        if Win._RecomputeTabGrid then Win:_RecomputeTabGrid() end
         if not Win.ActiveTab then selectTab(Tab) end
 
         -- ─── CreateGroup ─────────────────────────────
