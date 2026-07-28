@@ -799,7 +799,6 @@ function Library:CreateWindow(opts)
         Size = UDim2.new(1,0,1,-36), Position = UDim2.fromOffset(0,36),
         BackgroundTransparency = 1, ZIndex = 2, Parent = sidebar,
     })
-    local TAB_MAX_H = 52
     if Win.Compact then
         Win._tabGrid = New("UIGridLayout", {
             CellSize = UDim2.fromOffset(sidebarW/2 - 4, 40),
@@ -814,7 +813,7 @@ function Library:CreateWindow(opts)
             local rows = math.ceil(n / 2)
             local pad = 2
             local listH = sz.Y - 36
-            local cellH = math.min(TAB_MAX_H, math.floor((listH - (rows - 1) * pad) / rows))
+            local cellH = math.floor((listH - (rows - 1) * pad) / rows)
             Win._tabGrid.CellSize = UDim2.fromOffset(sidebarW/2 - 4, math.max(cellH, 40))
         end
     else
@@ -824,7 +823,7 @@ function Library:CreateWindow(opts)
             local n = math.max(#Win.Tabs, 1)
             local pad = 2
             local listH = sz.Y - 36
-            local rowH = math.max(32, math.min(TAB_MAX_H, math.floor((listH - (n - 1) * pad) / n)))
+            local rowH = math.max(32, math.floor((listH - (n - 1) * pad) / n))
             for _, t in ipairs(Win.Tabs) do
                 if t.BtnFrame then t.BtnFrame.Size = UDim2.new(1, 0, 0, rowH) end
             end
