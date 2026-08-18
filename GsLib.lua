@@ -1167,12 +1167,17 @@ function Library:CreateWindow(opts)
             -- simple white label, no underline
             function G:AddSection(text)
                 local r = row(16)
-                New("TextLabel", {
+                local lbl = New("TextLabel", {
                     Size=UDim2.new(1,0,1,0), BackgroundTransparency=1,
                     Font=Theme.Bold, TextSize=11,
                     Text=(text or ""):upper(), TextColor3=Color3.new(1,1,1),
                     TextXAlignment=Enum.TextXAlignment.Left, Parent=r,
                 })
+                local Sec = { Row = r, Label = lbl }
+                function Sec:SetText(s) lbl.Text = tostring(s or ""):upper() end
+                function Sec:SetColor(c) lbl.TextColor3 = c end
+                function Sec:SetVisible(vis) r.Visible = vis end
+                return Sec
             end
 
             -- ═══ TOGGLE ═════════════════════════════
@@ -1214,6 +1219,8 @@ function Library:CreateWindow(opts)
                     if o.Callback then pcall(o.Callback, vv) end
                 end
                 function T2:Get() return T2.Value end
+                function T2:SetText(s) lbl2.Text = s end
+                function T2:SetColor(c) lbl2.TextColor3 = c end
 
                 if o.Default then T2:Set(true) end
                 regAccent(function() if T2.Value then sq.BackgroundColor3 = Theme.Accent end end)
@@ -1248,7 +1255,7 @@ function Library:CreateWindow(opts)
 
                 local r = row(34)
                 -- name only (the value lives ON the slider, nowhere else)
-                New("TextLabel", {
+                local nameLbl = New("TextLabel", {
                     BackgroundTransparency=1, Size=UDim2.new(1,0,0,13),
                     Font=Theme.Font, TextSize=Theme.Sz, Text=o.Text or "Slider",
                     TextColor3=Color3.new(1,1,1), TextXAlignment=Enum.TextXAlignment.Left, Parent=r,
@@ -1308,6 +1315,16 @@ function Library:CreateWindow(opts)
                     if o.Callback then pcall(o.Callback, vv) end
                 end
                 function S:Get() return S.Value end
+                function S:SetText(s) nameLbl.Text = s end
+                function S:SetVisible(vis) r.Visible = vis end
+                function S:SetRange(newMin, newMax)
+                    mn = tonumber(newMin) or mn
+                    mx = tonumber(newMax) or mx
+                    if mx < mn then mn, mx = mx, mn end
+                    S:Set(S.Value)
+                end
+                function S:SetSuffix(sfx) o.Suffix = sfx; S:Set(S.Value) end
+                S.Row = r
 
                 local drag = false
                 local function upd(x)
@@ -1343,7 +1360,7 @@ function Library:CreateWindow(opts)
                 end
 
                 local r = row(32)
-                New("TextLabel", {
+                local ddNameLbl = New("TextLabel", {
                     BackgroundTransparency=1, Size=UDim2.new(1,0,0,11),
                     Font=Theme.Font, TextSize=11, Text=o.Text or "Dropdown",
                     TextColor3=Theme.Dim, TextXAlignment=Enum.TextXAlignment.Left, Parent=r,
@@ -1477,6 +1494,8 @@ function Library:CreateWindow(opts)
                 function D:Get() return D.Value end
                 function D:SetOptions(opts2) D.Options=opts2 or {}; display() end
                 function D:SetVisible(vis) r.Visible = vis end  -- collapses in the list layout when hidden
+                function D:SetText(s) ddNameLbl.Text = s end
+                D.Row = r
                 display()
                 cfgReg(o.Key, "dropdown", D, o.Text)
                 return D
@@ -1486,7 +1505,7 @@ function Library:CreateWindow(opts)
             function G:AddColorPicker(o)
                 o = o or {}
                 local r = row(17)
-                New("TextLabel", {
+                local cpNameLbl = New("TextLabel", {
                     BackgroundTransparency=1, Size=UDim2.new(1,-28,1,0),
                     Font=Theme.Font, TextSize=Theme.Sz, Text=o.Text or "Color",
                     TextColor3=Theme.Dim, TextXAlignment=Enum.TextXAlignment.Left, Parent=r,
@@ -1499,6 +1518,9 @@ function Library:CreateWindow(opts)
                 List(Enum.FillDirection.Horizontal, 0,
                      Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Center, h2)
                 local P = mountColorPicker(h2, o, Win)
+                P.Row = r
+                function P:SetVisible(vis) r.Visible = vis end
+                function P:SetText(s) cpNameLbl.Text = s end
                 cfgReg(o.Key, "color", P, o.Text)
                 return P
             end
@@ -1507,7 +1529,7 @@ function Library:CreateWindow(opts)
             function G:AddKeybind(o)
                 o = o or {}
                 local r = row(17)
-                New("TextLabel", {
+                local kbNameLbl = New("TextLabel", {
                     BackgroundTransparency=1, Size=UDim2.new(1,-60,1,0),
                     Font=Theme.Font, TextSize=Theme.Sz, Text=o.Text or "Keybind",
                     TextColor3=Theme.Dim, TextXAlignment=Enum.TextXAlignment.Left, Parent=r,
@@ -1520,6 +1542,9 @@ function Library:CreateWindow(opts)
                 List(Enum.FillDirection.Horizontal, 0,
                      Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Center, h2)
                 local K = mountKeybind(h2, o, Win)
+                K.Row = r
+                function K:SetVisible(vis) r.Visible = vis end
+                function K:SetText(s) kbNameLbl.Text = s end
                 cfgReg(o.Key, "keybind", K, o.Text)
                 return K
             end
@@ -1535,11 +1560,21 @@ function Library:CreateWindow(opts)
                     TextColor3=Theme.Text, Parent=r,
                 })
                 Stroke(Theme.BorderDim, 1, btn2)
-                btn2.MouseEnter:Connect(function() tw(btn2,.1,{BackgroundColor3=Theme.ElemHov}) end)
+                local enabled = true
+                btn2.MouseEnter:Connect(function()
+                    if enabled then tw(btn2,.1,{BackgroundColor3=Theme.ElemHov}) end
+                end)
                 btn2.MouseLeave:Connect(function() tw(btn2,.1,{BackgroundColor3=Theme.Elem}) end)
-                btn2.MouseButton1Click:Connect(function() if o.Callback then pcall(o.Callback) end end)
-                local Btn = {}
+                btn2.MouseButton1Click:Connect(function()
+                    if enabled and o.Callback then pcall(o.Callback) end
+                end)
+                local Btn = { Row = r, Button = btn2 }
                 function Btn:SetText(t) btn2.Text=t end
+                function Btn:SetVisible(vis) r.Visible = vis end
+                function Btn:SetEnabled(on)
+                    enabled = on ~= false
+                    btn2.TextColor3 = enabled and Theme.Text or Theme.Muted
+                end
                 return Btn
             end
 
@@ -1553,8 +1588,11 @@ function Library:CreateWindow(opts)
                     TextColor3=Theme.Muted, TextXAlignment=Enum.TextXAlignment.Left,
                     RichText=true, TextWrapped=true, Parent=r,
                 })
-                local L = {}
+                local L = { Row = r, Label = lbl3 }
                 function L:SetText(s) lbl3.Text=s end
+                function L:GetText() return lbl3.Text end
+                function L:SetColor(c) lbl3.TextColor3=c end
+                function L:SetVisible(vis) r.Visible = vis end
                 return L
             end
 
@@ -1580,8 +1618,10 @@ function Library:CreateWindow(opts)
                     Text=o.Text or "", TextColor3=Theme.Dim,
                     TextXAlignment=Enum.TextXAlignment.Left, TextWrapped=true, Parent=r,
                 })
-                local P2 = {}
+                local P2 = { Row = r, Label = bodyLbl }
                 function P2:SetText(s) bodyLbl.Text=s end
+                function P2:SetColor(c) bodyLbl.TextColor3=c end
+                function P2:SetVisible(vis) r.Visible = vis end
                 return P2
             end
 
@@ -1589,7 +1629,7 @@ function Library:CreateWindow(opts)
             function G:AddInput(o)
                 o = o or {}
                 local r = row(32)
-                New("TextLabel", {
+                local inNameLbl = New("TextLabel", {
                     BackgroundTransparency=1, Size=UDim2.new(1,0,0,12),
                     Font=Theme.Font, TextSize=11, Text=o.Text or "Input",
                     TextColor3=Theme.Dim, TextXAlignment=Enum.TextXAlignment.Left, Parent=r,
@@ -1611,9 +1651,12 @@ function Library:CreateWindow(opts)
                     if o.Callback then pcall(o.Callback, box.Text) end
                     if o.ClearOnFocus then box.Text="" end
                 end)
-                local I = {}
+                local I = { Row = r, Box = box }
                 function I:Get() return box.Text end
                 function I:Set(t) box.Text=t end
+                function I:SetText(s) inNameLbl.Text = s end
+                function I:SetPlaceholder(s) box.PlaceholderText = s end
+                function I:SetVisible(vis) r.Visible = vis end
                 cfgReg(o.Key, "input", I, o.Text)
                 return I
             end
@@ -1659,8 +1702,14 @@ function Library:CreateWindow(opts)
                     Parent = scroll,
                 })
 
-                local L = {}
+                local L = { Row = container, Container = container }
                 L.OnSelect = nil
+                function L:SetVisible(vis) container.Visible = vis end
+                function L:SetHeight(h2)
+                    boxH = tonumber(h2) or boxH
+                    container.Size = UDim2.new(1, 0, 0, boxH)
+                end
+                function L:GetItems() return items end
 
                 local function applyRowStyle(row, name)
                     local on = (name == sel)
