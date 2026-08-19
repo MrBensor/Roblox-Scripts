@@ -1,6 +1,6 @@
 --[[
     GsLib v2 – GameSense/Skeet-style UI Framework for Roblox executors
-    Modified for Operation One: legend-style group headers, no small corners,
+    Modified for Gamesense: legend-style group headers, no small corners,
     slider +/- buttons, floating value label, white section text.
 ]]
 
@@ -1152,6 +1152,49 @@ function Library:CreateWindow(opts)
                 })
             end
 
+            -- ═══ NESTING ════════════════════════════
+            -- Widgets mit o.ParentToggle werden eingerueckt und nur sichtbar,
+            -- solange der Eltern-Toggle an ist. Beliebig tief schachtelbar.
+            local NEST_INDENT = 12
+
+            local function nestApply(W, visible)
+                if W.SetVisible then pcall(W.SetVisible, W, visible) end
+                W._NestShown = visible
+                local kids = W._Children
+                if not kids then return end
+                local childVis = visible and (W.Value ~= false) or false
+                for _, k in ipairs(kids) do
+                    nestApply(k, childVis)
+                end
+            end
+
+            local function nestRefresh(W)
+                local kids = W._Children
+                if not kids then return end
+                local on = (W._NestShown ~= false) and (W.Value and true or false)
+                for _, k in ipairs(kids) do
+                    nestApply(k, on)
+                end
+            end
+
+            local function nest(o, W)
+                if type(o) ~= "table" or type(W) ~= "table" then return W end
+                local p = o.ParentToggle
+                if type(p) ~= "table" or not p.Row then return W end
+                local depth = (p._Depth or 0) + 1
+                W._Depth = depth
+                local target = W.Row or W.Container
+                if target then
+                    New("UIPadding", {
+                        PaddingLeft = UDim.new(0, NEST_INDENT * depth), Parent = target,
+                    })
+                end
+                p._Children = p._Children or {}
+                table.insert(p._Children, W)
+                nestApply(W, (p._NestShown ~= false) and (p.Value and true or false))
+                return W
+            end
+
             local function addonHolder(parent)
                 local h = New("Frame", {
                     AnchorPoint=Vector2.new(1,.5), Position=UDim2.new(1,0,.5,0),
@@ -1216,6 +1259,7 @@ function Library:CreateWindow(opts)
                         sq.BackgroundColor3 = vv and Theme.Accent or Theme.CheckOff
                         lbl2.TextColor3     = vv and Theme.Text or Theme.Dim
                     end)
+                    nestRefresh(T2)
                     if o.Callback then pcall(o.Callback, vv) end
                 end
                 function T2:Get() return T2.Value end
@@ -1767,6 +1811,34 @@ function Library:CreateWindow(opts)
                     for i, r in ipairs(rows) do applyRowStyle(r, items[i]) end
                 end
                 return L
+            end
+
+            -- ═══ DIVIDER ════════════════════════════
+            function G:AddDivider(o)
+                o = o or {}
+                local r = row(o.Height or 7)
+                local line = New("Frame", {
+                    Size = UDim2.new(1, 0, 0, 1), Position = UDim2.new(0, 0, .5, 0),
+                    BackgroundColor3 = Theme.IslandBorder, BorderSizePixel = 0, Parent = r,
+                })
+                local D = { Row = r, Line = line }
+                function D:SetVisible(vis) r.Visible = vis end
+                function D:SetColor(c) line.BackgroundColor3 = c end
+                return D
+            end
+
+            -- Nesting fuer alle Widget-Konstruktoren aktivieren: ein Aufruf mit
+            -- o.ParentToggle = <toggle> rueckt ein und blendet mit dem Eltern-Toggle.
+            for _, fname in ipairs({
+                "AddToggle", "AddSlider", "AddDropdown", "AddColorPicker", "AddKeybind",
+                "AddButton", "AddLabel", "AddParagraph", "AddInput", "AddListBox", "AddDivider",
+            }) do
+                local orig = rawget(G, fname)
+                if type(orig) == "function" then
+                    G[fname] = function(self, o, ...)
+                        return nest(o, orig(self, o, ...))
+                    end
+                end
             end
 
             return G
