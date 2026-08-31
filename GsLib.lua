@@ -146,7 +146,7 @@ function Library:Notify(o)
     Stroke(Theme.IslandBorder, 1, toast)
     New("Frame", {
         Size = UDim2.new(0, 2, 1, 0),
-        BackgroundColor3 = Theme.Accent,
+        BackgroundColor3 = (typeof(o.Accent) == "Color3") and o.Accent or Theme.Accent,
         BorderSizePixel = 0,
         ZIndex = 2,
         Parent = toast,
@@ -161,12 +161,24 @@ function Library:Notify(o)
     Pad(8, 8, 0, 0, inner)
     List(Enum.FillDirection.Vertical, 3, Enum.HorizontalAlignment.Left,
          Enum.VerticalAlignment.Top, inner)
+    if o.From and o.From ~= "" then
+        New("TextLabel", {
+            Size = UDim2.new(1, 0, 0, 12),
+            BackgroundTransparency = 1,
+            Font = Theme.Bold, TextSize = 11,
+            Text = o.From,
+            TextColor3 = (typeof(o.FromColor) == "Color3") and o.FromColor or Theme.Dim,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Parent = inner,
+        })
+    end
     if o.Title and o.Title ~= "" then
         New("TextLabel", {
             Size = UDim2.new(1, 0, 0, 16),
             BackgroundTransparency = 1,
             Font = Theme.Bold, TextSize = 13,
-            Text = o.Title, TextColor3 = Theme.Text,
+            Text = o.Title,
+            TextColor3 = (typeof(o.TitleColor) == "Color3") and o.TitleColor or Theme.Text,
             TextXAlignment = Enum.TextXAlignment.Left,
             Parent = inner,
         })
@@ -177,7 +189,8 @@ function Library:Notify(o)
             AutomaticSize = Enum.AutomaticSize.Y,
             BackgroundTransparency = 1,
             Font = Theme.Font, TextSize = 12,
-            Text = o.Text, TextColor3 = Theme.Dim,
+            Text = o.Text,
+            TextColor3 = (typeof(o.TextColor) == "Color3") and o.TextColor or Theme.Dim,
             TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
             Parent = inner,
         })
@@ -720,7 +733,7 @@ function Library:CreateWindow(opts)
                     Visible=true, Conns={}, Accents={} }
     Win.Compact = opts.Compact and true or false
     local compactScale = Win.Compact and (opts.CompactScale or 0.72) or 1
-    local sidebarW = Win.Compact and 96 or 54
+    local sidebarW = Win.Compact and 96 or 82
     local visW, visH = sz.X * compactScale, sz.Y * compactScale
 
     -- every accent-coloured element registers a closure here; SetAccent re-runs them
@@ -790,11 +803,21 @@ function Library:CreateWindow(opts)
     })
     local sideTitleLbl = New("TextLabel", {
         Size = UDim2.fromScale(1,1), BackgroundTransparency = 1,
-        Font = Theme.Bold, TextSize = 11,
-        Text = title:upper():sub(1,5),
-        TextColor3 = Theme.Accent, Parent = sideTitle,
+        Font = Theme.Bold, TextSize = 13, RichText = true,
+        TextColor3 = Color3.new(1,1,1), Parent = sideTitle,
     })
-    regAccent(function() sideTitleLbl.TextColor3 = Theme.Accent end)
+    local function renderBrand()
+        local hex = string.format("#%02X%02X%02X",
+            math.floor(Theme.Accent.R * 255 + 0.5),
+            math.floor(Theme.Accent.G * 255 + 0.5),
+            math.floor(Theme.Accent.B * 255 + 0.5))
+        local head, tail = title:sub(1, 4), title:sub(5)
+        if title:lower():sub(1, 9) == "gamesense" then head, tail = "Game", "Sense" .. title:sub(10) end
+        sideTitleLbl.Text = ('<font color="#FFFFFF">%s</font><font color="%s">%s</font>')
+            :format(head, hex, tail)
+    end
+    renderBrand()
+    regAccent(renderBrand)
     local tabList = New("Frame", {
         Size = UDim2.new(1,0,1,-36), Position = UDim2.fromOffset(0,36),
         BackgroundTransparency = 1, ZIndex = 2, Parent = sidebar,
@@ -959,9 +982,13 @@ function Library:CreateWindow(opts)
             })
         else
             New("TextLabel", {
-                Size = UDim2.fromScale(1,1), BackgroundTransparency = 1,
+                Size = UDim2.new(1, -6, 1, 0), Position = UDim2.fromOffset(3, 0),
+                BackgroundTransparency = 1,
                 Font = Theme.Bold, TextSize = 11,
-                Text = name:upper():sub(1,4),
+                Text = name:upper(),
+                TextScaled = false, TextWrapped = false,
+                TextXAlignment = Enum.TextXAlignment.Center,
+                TextTruncate = Enum.TextTruncate.None,
                 TextColor3 = Theme.Dim, Parent = iconFrame,
             })
         end
