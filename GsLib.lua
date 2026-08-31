@@ -1732,6 +1732,55 @@ function Library:CreateWindow(opts)
                 return I
             end
 
+            -- ═══ INPUT + inline COLOR ═══════════════
+            function G:AddInputColor(o)
+                o = o or {}
+                local r = row(32)
+                local inNameLbl = New("TextLabel", {
+                    BackgroundTransparency=1, Size=UDim2.new(1,-40,0,12),
+                    Font=Theme.Font, TextSize=11, Text=o.Text or "Input",
+                    TextColor3=Theme.Dim, TextXAlignment=Enum.TextXAlignment.Left, Parent=r,
+                })
+                local box = New("TextBox", {
+                    Size=UDim2.new(1,-40,0,16), Position=UDim2.fromOffset(0,14),
+                    BackgroundColor3=Theme.Elem, BorderSizePixel=0,
+                    Font=Theme.Font, TextSize=Theme.Sz,
+                    PlaceholderText=o.Placeholder or "",
+                    Text=o.Default or "", TextColor3=Theme.Text,
+                    PlaceholderColor3=Theme.Muted,
+                    TextXAlignment=Enum.TextXAlignment.Left,
+                    ClearTextOnFocus=o.ClearOnFocus==true, Parent=r,
+                })
+                Corner(2, box)
+                Stroke(Theme.BorderDim, 1, box)
+                Pad(0,0,5,5,box)
+                box.FocusLost:Connect(function()
+                    if o.Callback then pcall(o.Callback, box.Text) end
+                    if o.ClearOnFocus then box.Text="" end
+                end)
+                -- inline colorpicker swatch, right-aligned on the textbox line
+                local ch = New("Frame", {
+                    AnchorPoint=Vector2.new(1,0.5), Position=UDim2.new(1,0,0,22),
+                    Size=UDim2.new(0,0,0,16), AutomaticSize=Enum.AutomaticSize.X,
+                    BackgroundTransparency=1, Parent=r,
+                })
+                List(Enum.FillDirection.Horizontal, 0,
+                     Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Center, ch)
+                local P = mountColorPicker(ch, {
+                    Default = o.DefaultColor or Color3.new(1,1,1),
+                    Callback = o.ColorCallback,
+                }, Win)
+                local IC = { Row=r, Box=box, Color=P }
+                function IC:Get() return box.Text end
+                function IC:Set(t) box.Text=t end
+                function IC:GetColor() local c = P:Get() return c end
+                function IC:SetColor(c) P:Set(c) end
+                function IC:SetText(s) inNameLbl.Text=s end
+                function IC:SetVisible(vis) r.Visible=vis end
+                cfgReg(o.Key, "input", IC, o.Text)
+                return IC
+            end
+
             -- ═══ LISTBOX ════════════════════════════
             function G:AddListBox(o)
                 o = o or {}
